@@ -22,6 +22,7 @@ if %errorlevel% neq 0 (
 
 echo [1/3] Проверка и установка зависимостей (npm install)...
 call npm install
+call npm install --no-save @rollup/rollup-win32-x64-msvc 2>nul
 if %errorlevel% neq 0 (
     echo.
     echo [ОШИБКА] Не удалось установить зависимости npm.
