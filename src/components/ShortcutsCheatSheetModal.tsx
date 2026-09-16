@@ -22,7 +22,6 @@ const SHORTCUTS: ShortcutItem[] = [
   { keys: ['Ctrl', '1...5'], action: 'Быстрое переключение вкладок (Шаблоны / Excel / Плейсхолдеры / Ссылки / Заметки)', category: 'Режимы окна' },
   { keys: ['Ctrl', 'Enter'], action: 'Скопировать готовый сформированный ответ из редактора', category: 'Редактор и буфер' },
   { keys: ['Ctrl', 'B'], action: 'Переключить ультракомпактный режим окна Mini-HUD', category: 'Режимы окна' },
-  { keys: ['Ctrl', 'Shift', 'E'], action: 'Открыть Центр экспорта в Windows (.EXE)', category: 'Основные' },
   { keys: ['Ctrl', 'Alt', 'Q'], action: 'Глобальный вызов / скрытие окна поверх любого приложения (в Windows)', category: 'Режимы окна' },
   { keys: ['Ctrl', 'N'], action: 'Создать новый шаблон быстрого ответа', category: 'Основные' },
   { keys: ['Ctrl', 'D'], action: 'Быстрое переключение на вкладку Excel-базы данных', category: 'Режимы окна' },

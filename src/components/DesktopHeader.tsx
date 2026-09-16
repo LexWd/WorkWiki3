@@ -15,8 +15,7 @@ import {
   CheckCircle2,
   FileSpreadsheet,
   Globe,
-  StickyNote,
-  Monitor
+  StickyNote
 } from 'lucide-react';
 import { GuiSettings, ProductivityMetrics, ExcelRow, ActiveTab } from '../types';
 import { getThemeClasses, getAccentClasses } from '../utils/theme';
@@ -30,7 +29,6 @@ interface DesktopHeaderProps {
   onOpenSettings: () => void;
   onOpenShortcuts: () => void;
   onOpenPalette: () => void;
-  onOpenWindowsExport: () => void;
   metrics: ProductivityMetrics;
   isMiniMode: boolean;
   onToggleMiniMode: () => void;
@@ -50,7 +48,6 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({
   onOpenSettings,
   onOpenShortcuts,
   onOpenPalette,
-  onOpenWindowsExport,
   metrics,
   isMiniMode,
   onToggleMiniMode,
@@ -203,16 +200,6 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({
           title={isMiniMode ? 'Развернуть полное окно' : 'Компактный мини-HUD режим (Ctrl+B)'}
         >
           {isMiniMode ? <Maximize2 className="w-3.5 h-3.5" /> : <Minimize2 className="w-3.5 h-3.5" />}
-        </button>
-
-        {/* Windows EXE Export */}
-        <button
-          onClick={onOpenWindowsExport}
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-sky-500/40 bg-sky-950/40 hover:bg-sky-900/50 text-sky-300 text-xs font-semibold transition-all shadow-xs"
-          title="Сборка и экспорт в Windows (.exe)"
-        >
-          <Monitor className="w-3.5 h-3.5 text-sky-400" />
-          <span className="hidden sm:inline">Экспорт EXE</span>
         </button>
 
         {/* GUI Customization Settings */}

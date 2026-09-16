@@ -30,7 +30,6 @@ import { ShortcutsCheatSheetModal } from './components/ShortcutsCheatSheetModal'
 import { ProductivityStatsBar } from './components/ProductivityStatsBar';
 import { ToastNotice, ToastItem } from './components/ToastNotice';
 import { DesktopTitleBar } from './components/DesktopTitleBar';
-import { ExportWindowsExeModal } from './components/ExportWindowsExeModal';
 
 export default function App() {
   // Core persistent states
@@ -70,7 +69,6 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsInitialSection, setSettingsInitialSection] = useState<'gui' | 'collections' | 'backup'>('gui');
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
-  const [isWindowsExportOpen, setIsWindowsExportOpen] = useState(false);
   const [editingSnippet, setEditingSnippet] = useState<Snippet | null | 'NEW'>(null);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
@@ -431,13 +429,6 @@ export default function App() {
         return;
       }
 
-      // Ctrl + Shift + E -> Windows EXE Export Center
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'E' || e.key === 'e')) {
-        e.preventDefault();
-        setIsWindowsExportOpen((prev) => !prev);
-        return;
-      }
-
       // Alt + 1 through Alt + 9 -> Instant Copy
       if (e.altKey && !e.ctrlKey && !e.metaKey && e.key >= '1' && e.key <= '9') {
         e.preventDefault();
@@ -532,7 +523,6 @@ export default function App() {
         }}
         onOpenShortcuts={() => setIsShortcutsOpen(true)}
         onOpenPalette={() => setIsPaletteOpen(true)}
-        onOpenWindowsExport={() => setIsWindowsExportOpen(true)}
         metrics={metrics}
         isMiniMode={settings.windowMode === 'mini-bar'}
         onToggleMiniMode={() =>
@@ -748,14 +738,6 @@ export default function App() {
         isOpen={isShortcutsOpen}
         onClose={() => setIsShortcutsOpen(false)}
         settings={settings}
-      />
-
-      {/* 5. Windows EXE Export Center Modal */}
-      <ExportWindowsExeModal
-        isOpen={isWindowsExportOpen}
-        onClose={() => setIsWindowsExportOpen(false)}
-        settings={settings}
-        onNotification={(msg) => showToast('Экспорт Windows', msg)}
       />
     </div>
   );
