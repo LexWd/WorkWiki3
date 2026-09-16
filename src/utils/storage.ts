@@ -16,8 +16,29 @@ const SETTINGS_KEY = 'quickreply_ru_settings_v2';
 const METRICS_KEY = 'quickreply_ru_metrics_v2';
 const WIDGETS_KEY = 'quickreply_ru_widgets_v2';
 const NOTES_KEY = 'quickreply_ru_notes_v2';
+const CATEGORIES_KEY = 'quickreply_ru_custom_categories_v2';
 
 export const storage = {
+  loadCustomCategories(): string[] {
+    try {
+      const data = localStorage.getItem(CATEGORIES_KEY);
+      if (data) {
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {
+      console.warn('Failed to load custom categories:', e);
+    }
+    return [];
+  },
+
+  saveCustomCategories(categories: string[]) {
+    try {
+      localStorage.setItem(CATEGORIES_KEY, JSON.stringify(categories));
+    } catch (e) {
+      console.error('Failed to save custom categories:', e);
+    }
+  },
   loadSnippets(): Snippet[] {
     try {
       const data = localStorage.getItem(SNIPPETS_KEY);
@@ -231,5 +252,6 @@ export const storage = {
     localStorage.removeItem(NOTES_KEY);
     localStorage.removeItem(SETTINGS_KEY);
     localStorage.removeItem(METRICS_KEY);
+    localStorage.removeItem(CATEGORIES_KEY);
   },
 };

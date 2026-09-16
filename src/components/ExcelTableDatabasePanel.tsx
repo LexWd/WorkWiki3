@@ -16,6 +16,7 @@ import {
   ArrowUpDown,
   FileText,
   AlertTriangle,
+  AlertCircle,
   RotateCcw,
   X
 } from 'lucide-react';
@@ -58,6 +59,8 @@ export const ExcelTableDatabasePanel: React.FC<ExcelTableDatabasePanelProps> = (
   // Table deletion & creation modals
   const [isDeleteTableModalOpen, setIsDeleteTableModalOpen] = useState(false);
   const [isCreateTableModalOpen, setIsCreateTableModalOpen] = useState(false);
+  const [createTableError, setCreateTableError] = useState<string | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
   const [newTableName, setNewTableName] = useState('');
   const [newTableColsInput, setNewTableColsInput] = useState('Номер заказа, Клиент, Служба доставки, Статус, Город');
 
@@ -117,9 +120,10 @@ export const ExcelTableDatabasePanel: React.FC<ExcelTableDatabasePanelProps> = (
       };
       onCreateTable(newTable);
       onSelectTable(newTable.id);
+      setImportError(null);
       soundService.playCopyChime(settings.soundEffects);
     } catch (err) {
-      alert('Ошибка при чтении файла Excel/CSV: ' + (err instanceof Error ? err.message : String(err)));
+      setImportError('Ошибка при чтении файла Excel/CSV: ' + (err instanceof Error ? err.message : String(err)));
     } finally {
       setIsImporting(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -183,7 +187,7 @@ export const ExcelTableDatabasePanel: React.FC<ExcelTableDatabasePanelProps> = (
       .filter((c) => c.length > 0);
 
     if (cols.length === 0) {
-      alert('Укажите хотя бы одну колонку для таблицы');
+      setCreateTableError('Укажите хотя бы одну колонку для таблицы');
       return;
     }
 
@@ -736,6 +740,13 @@ export const ExcelTableDatabasePanel: React.FC<ExcelTableDatabasePanelProps> = (
                 <X className="w-4 h-4" />
               </button>
             </div>
+
+            {createTableError && (
+              <div className="mb-3 p-2 rounded bg-rose-950/80 border border-rose-500/80 text-rose-200 text-xs flex items-center gap-1.5">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0 text-rose-400" />
+                <span>{createTableError}</span>
+              </div>
+            )}
 
             <div className="space-y-3 text-xs">
               <div>

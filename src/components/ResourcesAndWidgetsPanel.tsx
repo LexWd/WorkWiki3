@@ -28,7 +28,8 @@ import {
   Columns,
   Square,
   Sliders,
-  Maximize2
+  Maximize2,
+  AlertCircle
 } from 'lucide-react';
 import { ResourceWidget, WidgetType, WidgetIconType, GuiSettings } from '../types';
 import { getThemeClasses, getAccentClasses } from '../utils/theme';
@@ -90,6 +91,7 @@ export const ResourcesAndWidgetsPanel: React.FC<ResourcesAndWidgetsPanelProps> =
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingWidget, setEditingWidget] = useState<ResourceWidget | null>(null);
+  const [modalError, setModalError] = useState<string | null>(null);
 
   // Form State
   const [formTitle, setFormTitle] = useState('');
@@ -206,6 +208,7 @@ export const ResourcesAndWidgetsPanel: React.FC<ResourcesAndWidgetsPanelProps> =
     setFormIframeHeight(420);
     setFormIframeWidth('full');
     setFormIsPinned(false);
+    setModalError(null);
     setIsModalOpen(true);
   };
 
@@ -224,13 +227,14 @@ export const ResourcesAndWidgetsPanel: React.FC<ResourcesAndWidgetsPanelProps> =
     setFormIframeHeight(widget.iframeHeight || 420);
     setFormIframeWidth(widget.iframeWidth || 'full');
     setFormIsPinned(!!widget.isPinned);
+    setModalError(null);
     setIsModalOpen(true);
   };
 
   // Save Modal
   const handleSaveModal = () => {
     if (!formTitle.trim() || !formUrl.trim()) {
-      alert('Заполните название и URL ссылку');
+      setModalError('Пожалуйста, укажите название и URL ссылку');
       return;
     }
 
@@ -787,6 +791,13 @@ export const ResourcesAndWidgetsPanel: React.FC<ResourcesAndWidgetsPanelProps> =
                 <X className="w-4 h-4" />
               </button>
             </div>
+
+            {modalError && (
+              <div className="mb-3 p-2 rounded-lg bg-rose-950/80 border border-rose-500/80 text-rose-200 text-xs flex items-center gap-2">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0 text-rose-400" />
+                <span>{modalError}</span>
+              </div>
+            )}
 
             <div className="space-y-3.5 text-xs">
               {/* Type Switcher */}

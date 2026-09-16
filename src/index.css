@@ -53,3 +53,16 @@ html[data-font-size="base"] {
 html[data-font-size="lg"] {
   font-size: 17px;
 }
+
+/* Ensure all interactive controls are always focusable, selectable, and never blocked by parent select-none */
+input, textarea, select {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  pointer-events: auto !important;
+}
+
+input[type="checkbox"], input[type="radio"], button {
+  user-select: none;
+  -webkit-user-select: none;
+  pointer-events: auto !important;
+}

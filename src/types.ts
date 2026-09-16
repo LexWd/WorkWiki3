@@ -5,7 +5,8 @@ export type SnippetCategory =
   | 'Техническая поддержка'
   | 'Оплата и счета'
   | 'Эскалации'
-  | 'Завершение диалога';
+  | 'Завершение диалога'
+  | (string & {});
 
 export interface Snippet {
   id: string;

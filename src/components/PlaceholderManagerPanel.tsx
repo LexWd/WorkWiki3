@@ -11,6 +11,7 @@ import {
   RotateCcw, 
   Sparkles, 
   Link2,
+  AlertCircle,
   ChevronDown
 } from 'lucide-react';
 import { PlaceholderConfig, PlaceholderType, ExcelTable, GuiSettings } from '../types';
@@ -43,6 +44,7 @@ export const PlaceholderManagerPanel: React.FC<PlaceholderManagerPanelProps> = (
   const [newOptionInput, setNewOptionInput] = useState('');
   const [formDefaultVal, setFormDefaultVal] = useState('');
   const [formBinding, setFormBinding] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
 
   const theme = getThemeClasses(settings.theme);
   const accent = getAccentClasses(settings.accentColor);
@@ -62,6 +64,7 @@ export const PlaceholderManagerPanel: React.FC<PlaceholderManagerPanelProps> = (
     setFormOptions(p.options ? [...p.options] : []);
     setFormDefaultVal(p.defaultValue);
     setFormBinding(p.excelColumnBinding || '');
+    setFormError(null);
   };
 
   const startCreate = () => {
@@ -74,11 +77,13 @@ export const PlaceholderManagerPanel: React.FC<PlaceholderManagerPanelProps> = (
     setFormOptions(['Вариант 1', 'Вариант 2']);
     setFormDefaultVal('Вариант 1');
     setFormBinding('');
+    setFormError(null);
   };
 
   const cancelForm = () => {
     setEditingId(null);
     setIsCreatingNew(false);
+    setFormError(null);
   };
 
   const handleAddOption = () => {
@@ -102,7 +107,7 @@ export const PlaceholderManagerPanel: React.FC<PlaceholderManagerPanelProps> = (
   const handleSave = () => {
     const cleanKey = formKey.trim().replace(/[{}]/g, '').toLowerCase().replace(/\s+/g, '_');
     if (!cleanKey) {
-      alert('Пожалуйста, укажите ключ плейсхолдера (например: служба_доставки)');
+      setFormError('Пожалуйста, укажите ключ плейсхолдера (например: служба_доставки)');
       return;
     }
 
@@ -273,6 +278,13 @@ export const PlaceholderManagerPanel: React.FC<PlaceholderManagerPanelProps> = (
                   <X className="w-4 h-4" />
                 </button>
               </div>
+
+              {formError && (
+                <div className="p-2 rounded bg-rose-950/80 border border-rose-500/80 text-rose-200 text-xs flex items-center gap-1.5">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0 text-rose-400" />
+                  <span>{formError}</span>
+                </div>
+              )}
 
               {/* Key */}
               <div>

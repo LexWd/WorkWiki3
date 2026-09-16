@@ -70,6 +70,8 @@ export default function App() {
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   const [editingSnippet, setEditingSnippet] = useState<Snippet | null | 'NEW'>(null);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const [customCategories, setCustomCategories] = useState<string[]>(() => storage.loadCustomCategories());
+  const [newSnippetInitialCategory, setNewSnippetInitialCategory] = useState<string | undefined>(undefined);
 
   // Theme & font helpers
   const theme = getThemeClasses(settings.theme);
@@ -103,6 +105,10 @@ export default function App() {
   useEffect(() => {
     storage.saveMetrics(metrics);
   }, [metrics]);
+
+  useEffect(() => {
+    storage.saveCustomCategories(customCategories);
+  }, [customCategories]);
 
   // Apply density and font-size to document root so all components scale dynamically
   useEffect(() => {
@@ -255,9 +261,55 @@ export default function App() {
     showToast('Ресурс удален', 'Закладка удалена из списка');
   }, [showToast]);
 
+  // Custom categories management
+  const handleAddCategory = useCallback((newCat: string) => {
+    const trimmed = newCat.trim();
+    if (!trimmed) return;
+    setCustomCategories((prev) => {
+      if (prev.includes(trimmed)) return prev;
+      const updated = [...prev, trimmed];
+      storage.saveCustomCategories(updated);
+      return updated;
+    });
+    showToast('Категория добавлена', `Категория «${trimmed}» готова для шаблонов`);
+  }, [showToast]);
+
+  const handleDeleteCategory = useCallback((catToDelete: string) => {
+    setCustomCategories((prev) => {
+      const updated = prev.filter((c) => c !== catToDelete);
+      storage.saveCustomCategories(updated);
+      return updated;
+    });
+    showToast('Категория удалена', `Категория «${catToDelete}» удалена`);
+  }, [showToast]);
+
+  const allCategories = useMemo(() => {
+    const defaultList = [
+      'Приветствие и начало',
+      'Заказы и доставка',
+      'Возвраты и компенсации',
+      'Техническая поддержка',
+      'Оплата и счета',
+      'Эскалации',
+      'Завершение диалога',
+    ];
+    const fromSnippets = snippets.map((s) => s.category).filter(Boolean);
+    return Array.from(new Set([...defaultList, ...customCategories, ...fromSnippets]));
+  }, [snippets, customCategories]);
+
   // Snippet save
   const handleSaveSnippet = useCallback(
     (data: Omit<Snippet, 'id' | 'usageCount' | 'updatedAt'> & { id?: string }) => {
+      // If user saved snippet with new category, ensure category is tracked
+      if (data.category && !customCategories.includes(data.category)) {
+        setCustomCategories((prev) => {
+          if (prev.includes(data.category)) return prev;
+          const updated = [...prev, data.category];
+          storage.saveCustomCategories(updated);
+          return updated;
+        });
+      }
+
       if (data.id) {
         setSnippets((prev) =>
           prev.map((s) =>
@@ -276,6 +328,7 @@ export default function App() {
               : s
           )
         );
+        showToast('Шаблон обновлен', `«${data.title}» сохранено`);
       } else {
         const newSnip: Snippet = {
           id: 'snip-' + Date.now(),
@@ -290,10 +343,11 @@ export default function App() {
           updatedAt: Date.now(),
         };
         setSnippets((prev) => [newSnip, ...prev]);
+        showToast('Шаблон создан', `«${data.title}» добавлен в список`);
       }
       soundService.playCopyChime(settings.soundEffects);
     },
-    [settings.soundEffects]
+    [customCategories, settings.soundEffects, showToast]
   );
 
   const handleDeleteSnippet = useCallback((id: string) => {
@@ -517,7 +571,7 @@ export default function App() {
       setSettings(storage.loadSettings());
       showToast('Резервная копия загружена', 'Все шаблоны, таблицы, заметки и настройки успешно обновлены.');
     } else {
-      alert('Ошибка при чтении файла резервной копии. Проверьте формат JSON.');
+      showToast('Ошибка импорта', 'Ошибка при чтении файла резервной копии. Проверьте формат JSON.');
     }
   };
 
@@ -607,7 +661,10 @@ export default function App() {
                   onEditSnippet={(s) => setEditingSnippet(s)}
                   onDeleteSnippet={handleDeleteSnippet}
                   onTogglePin={handleTogglePin}
-                  onCreateNew={() => setEditingSnippet('NEW')}
+                  onCreateNew={(initialCat) => {
+                    setNewSnippetInitialCategory(initialCat);
+                    setEditingSnippet('NEW');
+                  }}
                   onOpenSettings={(sec) => {
                     setSettingsInitialSection(sec || 'gui');
                     setIsSettingsOpen(true);
@@ -619,6 +676,9 @@ export default function App() {
                       handleCopySnippet(s);
                     }
                   }}
+                  customCategories={customCategories}
+                  onAddCategory={handleAddCategory}
+                  onDeleteCategory={handleDeleteCategory}
                 />
               </div>
 
@@ -744,11 +804,17 @@ export default function App() {
       <SnippetEditorModal
         snippet={editingSnippet === 'NEW' ? null : editingSnippet}
         isOpen={editingSnippet !== null}
-        onClose={() => setEditingSnippet(null)}
+        onClose={() => {
+          setEditingSnippet(null);
+          setNewSnippetInitialCategory(undefined);
+        }}
         onSave={handleSaveSnippet}
         placeholders={placeholders}
         activeRow={activeRow}
         settings={settings}
+        availableCategories={allCategories}
+        onAddNewCategory={handleAddCategory}
+        initialCategory={newSnippetInitialCategory}
       />
 
       {/* 3. GUI Customization Modal */}
