@@ -22,14 +22,21 @@ import { NoteCard, NoteCardColor, GuiSettings } from '../types';
 import { getThemeClasses, getAccentClasses } from '../utils/theme';
 import { soundService } from '../utils/sound';
 import { NoteEditorModal } from './NoteEditorModal';
+import { ConfirmDialogModal } from './ConfirmDialogModal';
+
+const DEFAULT_NOTE_CATEGORIES = ['Текущая смена', 'Памятка', 'Эскалации', 'Черновики'];
 
 interface NotesManagerPanelProps {
   notes: NoteCard[];
-  onAddNote: (note: NoteCard) => void;
+  onAddNote?: (note: NoteCard) => void;
+  onCreateNote?: (note: NoteCard) => void;
   onUpdateNote: (note: NoteCard) => void;
   onDeleteNote: (id: string) => void;
+  onTogglePin?: (note: NoteCard) => void;
+  onToggleChecklistItem?: (noteId: string, itemId: string) => void;
   settings: GuiSettings;
   onNotification?: (msg: string) => void;
+  onCopyText?: (text: string, title?: string) => void;
 }
 
 const COLOR_STYLES: Record<
@@ -89,6 +96,7 @@ const COLOR_STYLES: Record<
 export const NotesManagerPanel: React.FC<NotesManagerPanelProps> = ({
   notes,
   onAddNote,
+  onCreateNote,
   onUpdateNote,
   onDeleteNote,
   settings,
@@ -102,6 +110,7 @@ export const NotesManagerPanel: React.FC<NotesManagerPanelProps> = ({
   const [copiedNoteId, setCopiedNoteId] = useState<string | null>(null);
 
   const [editingNote, setEditingNote] = useState<NoteCard | null | 'NEW'>(null);
+  const [noteToDelete, setNoteToDelete] = useState<NoteCard | null>(null);
 
   const theme = getThemeClasses(settings.theme);
   const accent = getAccentClasses(settings.accentColor);
@@ -413,9 +422,17 @@ export const NotesManagerPanel: React.FC<NotesManagerPanelProps> = ({
           isOpen={true}
           note={editingNote === 'NEW' ? null : editingNote}
           onClose={() => setEditingNote(null)}
+          onDelete={(id) => {
+            onDeleteNote(id);
+            onNotification?.('Заметка удалена');
+            setEditingNote(null);
+          }}
           onSave={(savedNote) => {
             if (editingNote === 'NEW') {
-              onAddNote(savedNote);
+              const createFn = onAddNote || onCreateNote;
+              if (createFn) {
+                createFn(savedNote);
+              }
               onNotification?.(`Заметка «${savedNote.title}» успешно создана`);
             } else {
               onUpdateNote(savedNote);
@@ -423,9 +440,41 @@ export const NotesManagerPanel: React.FC<NotesManagerPanelProps> = ({
             }
           }}
           settings={settings}
-          availableCategories={categories.length > 0 ? categories : ['Текущая смена', 'Памятка', 'Эскалации', 'Черновики']}
+          availableCategories={categories.length > 0 ? categories : DEFAULT_NOTE_CATEGORIES}
         />
       )}
+
+      {/* Confirmation Modal for Note Deletion */}
+      <ConfirmDialogModal
+        isOpen={noteToDelete !== null}
+        title="Удалить карточку-заметку?"
+        description={
+          noteToDelete ? (
+            <div className="space-y-1.5">
+              <div>
+                Вы действительно хотите удалить заметку <strong className="text-rose-300">«{noteToDelete.title || 'Без названия'}»</strong>?
+              </div>
+              {noteToDelete.checklist && noteToDelete.checklist.length > 0 && (
+                <div className="text-[11px] text-slate-400">
+                  В карточке также содержится чек-лист из {noteToDelete.checklist.length} пунктов.
+                </div>
+              )}
+            </div>
+          ) : null
+        }
+        confirmText="Удалить заметку"
+        cancelText="Отмена"
+        variant="danger"
+        icon="trash"
+        onConfirm={() => {
+          if (noteToDelete) {
+            onDeleteNote(noteToDelete.id);
+            onNotification?.(`Заметка «${noteToDelete.title}» удалена`);
+            setNoteToDelete(null);
+          }
+        }}
+        onCancel={() => setNoteToDelete(null)}
+      />
     </div>
   );
 
@@ -498,13 +547,12 @@ export const NotesManagerPanel: React.FC<NotesManagerPanelProps> = ({
               <Edit3 className="w-3.5 h-3.5" />
             </button>
             <button
-              onClick={() => {
-                if (confirm(`Удалить заметку «${note.title}»?`)) {
-                  onDeleteNote(note.id);
-                  onNotification?.(`Заметка «${note.title}» удалена`);
-                }
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setNoteToDelete(note);
               }}
-              className="p-1.5 rounded-lg bg-slate-800/80 border border-slate-700 text-slate-400 hover:text-rose-400 transition-colors"
+              className="p-1.5 rounded-lg bg-slate-800/80 border border-slate-700 text-slate-400 hover:text-rose-400 transition-colors cursor-pointer"
               title="Удалить"
             >
               <Trash2 className="w-3.5 h-3.5" />
@@ -555,13 +603,11 @@ export const NotesManagerPanel: React.FC<NotesManagerPanelProps> = ({
 
               <button
                 type="button"
-                onClick={() => {
-                  if (confirm(`Удалить карточку «${note.title}»?`)) {
-                    onDeleteNote(note.id);
-                    onNotification?.(`Заметка «${note.title}» удалена`);
-                  }
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setNoteToDelete(note);
                 }}
-                className="p-1 text-slate-500 hover:text-rose-400 rounded opacity-60 group-hover:opacity-100 transition-opacity"
+                className="p-1 text-slate-500 hover:text-rose-400 rounded opacity-60 group-hover:opacity-100 transition-opacity cursor-pointer"
                 title="Удалить"
               >
                 <Trash2 className="w-3.5 h-3.5" />

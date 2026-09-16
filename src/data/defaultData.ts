@@ -376,7 +376,7 @@ export const DEFAULT_GUI_SETTINGS: GuiSettings = {
   fontSize: 'sm',
   windowMode: 'full',
   soundEffects: true,
-  autoCopyOnSelect: true,
+  autoCopyOnSelect: false,
   offlineModeForced: false,
   agentName: 'Александр (Поддержка)',
 };

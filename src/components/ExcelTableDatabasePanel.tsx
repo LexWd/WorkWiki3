@@ -419,14 +419,13 @@ export const ExcelTableDatabasePanel: React.FC<ExcelTableDatabasePanelProps> = (
       return;
     }
 
-    const colNames = newTableColsInput
+    let colNames = newTableColsInput
       .split(/[,;\n]+/)
       .map((c) => c.trim())
       .filter((c) => c.length > 0);
 
     if (colNames.length === 0) {
-      setCreateTableError('Укажите хотя бы одну колонку');
-      return;
+      colNames = ['Наименование', 'Значение', 'Статус', 'Примечание'];
     }
 
     const cols: ExcelColumn[] = colNames.map((name, idx) => ({
@@ -449,195 +448,250 @@ export const ExcelTableDatabasePanel: React.FC<ExcelTableDatabasePanelProps> = (
     setIsCreateTableModalOpen(false);
     setCreateTableError(null);
     setNewTableName('');
+    setNewTableColsInput('');
     soundService.playClick(settings.soundEffects);
     if (onToastNotice) {
       onToastNotice('Таблица создана', `«${trimmedName}» готова к работе`);
     }
   };
 
-  if (!currentTable) {
-    return (
-      <div className={`flex flex-col items-center justify-center h-full p-8 text-center select-none ${theme.panel}`}>
-        <FileSpreadsheet className="w-16 h-16 text-slate-500 mb-4 opacity-40" />
-        <h2 className="text-base font-bold text-slate-200 mb-2">Таблицы базы данных отсутствуют</h2>
-        <p className="text-xs text-slate-400 max-w-md mb-6 leading-relaxed">
-          Создайте новую пустую таблицу или импортируйте существующий файл Excel (.xlsx) или .csv с заказами, тарифами или клиентами.
-        </p>
-        <div className="flex gap-3">
-          <button
-            onClick={() => setIsCreateTableModalOpen(true)}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg font-bold text-xs shadow-md ${accent.primary}`}
-          >
-            <Plus className="w-4 h-4" />
-            <span>Создать таблицу</span>
-          </button>
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-lg font-bold text-xs border border-slate-700 hover:bg-slate-800 text-slate-200"
-          >
-            <Upload className="w-4 h-4 text-emerald-400" />
-            <span>Импорт из файла</span>
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   // Max value for scaling bar chart
   const maxMetricVal = Math.max(...chartData.map((d) => d.metricValue), 1);
 
   return (
-    <div className={`flex flex-col h-full ${theme.panel} overflow-hidden text-xs select-none`}>
+    <div className={`flex flex-col h-full ${theme.panel} overflow-hidden text-xs select-none relative`}>
+      {/* Hidden File Input for Excel/CSV import - always mounted */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".xlsx,.xls,.csv"
+        onChange={handleFileUpload}
+        className="hidden"
+      />
+
       {/* Top Controls: Table Switcher, View Modes (Table / Charts / Split), Operations */}
       <div className={`p-2.5 border-b ${theme.border} ${theme.panelHeader} flex flex-wrap items-center justify-between gap-2 shrink-0`}>
-        {/* Table Selector + Management Buttons */}
-        <div className="flex items-center gap-2 flex-1 min-w-[280px]">
-          <span className="font-bold text-[11px] uppercase tracking-wider text-slate-400 shrink-0 flex items-center gap-1">
-            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
-            Таблица:
-          </span>
-          
-          <div className="relative flex-1 max-w-xs">
-            <select
-              value={currentTable.id}
-              onChange={(e) => onSelectTable(e.target.value)}
-              className={`w-full appearance-none pl-2.5 pr-6 py-1 rounded text-xs font-semibold border transition-colors outline-none cursor-pointer truncate ${theme.input}`}
-            >
-              {tables.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name} ({t.rows.length} строк)
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="w-3.5 h-3.5 absolute right-2 top-1/2 -translate-y-1/2 opacity-50 pointer-events-none" />
+        {currentTable ? (
+          <>
+            {/* Table Selector + Management Buttons */}
+            <div className="flex items-center gap-2 flex-1 min-w-[280px]">
+              <span className="font-bold text-[11px] uppercase tracking-wider text-slate-400 shrink-0 flex items-center gap-1">
+                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+                Таблица:
+              </span>
+              
+              <div className="relative flex-1 max-w-xs">
+                <select
+                  value={currentTable.id}
+                  onChange={(e) => onSelectTable(e.target.value)}
+                  className={`w-full appearance-none pl-2.5 pr-6 py-1 rounded text-xs font-semibold border transition-colors outline-none cursor-pointer truncate ${theme.input}`}
+                >
+                  {tables.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name} ({t.rows.length} строк)
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="w-3.5 h-3.5 absolute right-2 top-1/2 -translate-y-1/2 opacity-50 pointer-events-none" />
+              </div>
+
+              {/* Create New Table Button */}
+              <button
+                type="button"
+                onClick={() => setIsCreateTableModalOpen(true)}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-emerald-500/50 bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-300 font-semibold text-xs shrink-0 transition-colors cursor-pointer"
+                title="Создать новую таблицу в базе данных"
+              >
+                <Plus className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Создать таблицу</span>
+              </button>
+
+              {/* Import Button */}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isImporting}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-200 font-semibold text-xs shrink-0 transition-colors cursor-pointer"
+                title="Импортировать файл .xlsx или .csv"
+              >
+                <Upload className="w-3.5 h-3.5 text-emerald-400" />
+                <span>{isImporting ? 'Импорт...' : 'Импорт из файла'}</span>
+              </button>
+
+              {/* Delete Current Table Button */}
+              <button
+                type="button"
+                onClick={() => setIsDeleteTableModalOpen(true)}
+                className="flex items-center gap-1 px-2 py-1 rounded border border-rose-800/60 bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 text-[11px] font-medium shrink-0 transition-colors cursor-pointer"
+                title={`Удалить таблицу «${currentTable.name}»`}
+              >
+                <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                <span className="hidden sm:inline">Удалить</span>
+              </button>
+            </div>
+
+            {/* View Mode Switcher: Table | Charts | Split */}
+            <div className="flex items-center bg-slate-900/90 p-0.5 rounded-lg border border-slate-800 shrink-0">
+              <button
+                type="button"
+                onClick={() => setViewMode('table')}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-semibold transition-all cursor-pointer ${
+                  viewMode === 'table'
+                    ? `${accent.primary} shadow-xs font-bold`
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="Отображение таблицы данных с быстрым копированием ячеек"
+              >
+                <TableIcon className="w-3.5 h-3.5" />
+                <span>Таблица</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setViewMode('charts')}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-semibold transition-all cursor-pointer ${
+                  viewMode === 'charts'
+                    ? `${accent.primary} shadow-xs font-bold`
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="Графики и визуальная аналитика данных"
+              >
+                <BarChart3 className="w-3.5 h-3.5" />
+                <span>Графики</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setViewMode('split')}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-semibold transition-all cursor-pointer ${
+                  viewMode === 'split'
+                    ? `${accent.primary} shadow-xs font-bold`
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="Разделенный экран: график сверху, таблица снизу"
+              >
+                <Columns2 className="w-3.5 h-3.5" />
+                <span className="hidden md:inline">Разделенный</span>
+              </button>
+            </div>
+
+            {/* Operations: Export / Add Row */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => exportTableToXlsx(currentTable)}
+                className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] border transition-colors ${theme.panelSubtle} hover:border-slate-500 text-slate-300 cursor-pointer`}
+                title="Экспортировать в Excel (.xlsx)"
+              >
+                <Download className="w-3 h-3 text-sky-400" />
+                <span className="hidden sm:inline">XLSX</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => exportTableToCsv(currentTable)}
+                className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] border transition-colors ${theme.panelSubtle} hover:border-slate-500 text-slate-300 cursor-pointer`}
+                title="Экспортировать в CSV"
+              >
+                <FileText className="w-3 h-3 text-amber-400" />
+                <span className="hidden sm:inline">CSV</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsAddingRow(true)}
+                className={`flex items-center gap-1 px-3 py-1 rounded text-xs font-semibold shadow-sm ${accent.primary} cursor-pointer`}
+                title="Добавить новую строку в таблицу"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Строка</span>
+              </button>
+            </div>
+          </>
+        ) : (
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-2">
+              <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+              <span className="font-bold text-sm text-slate-100">База таблиц Excel</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsCreateTableModalOpen(true)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-xs shadow-md transition-all cursor-pointer ${accent.primary}`}
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Создать таблицу</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isImporting}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-xs border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 transition-all cursor-pointer"
+              >
+                <Upload className="w-3.5 h-3.5 text-emerald-400" />
+                <span>{isImporting ? 'Загрузка...' : 'Импорт из файла'}</span>
+              </button>
+            </div>
           </div>
-
-          {/* Create New Table Button */}
-          <button
-            onClick={() => setIsCreateTableModalOpen(true)}
-            className="p-1.5 rounded border border-slate-700/80 bg-slate-800/80 hover:bg-slate-700 text-slate-200 shrink-0 transition-colors cursor-pointer"
-            title="Создать новую таблицу в базе данных"
-          >
-            <Plus className="w-3.5 h-3.5 text-emerald-400" />
-          </button>
-
-          {/* Delete Current Table Button */}
-          <button
-            onClick={() => setIsDeleteTableModalOpen(true)}
-            className="flex items-center gap-1 px-2 py-1 rounded border border-rose-800/60 bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 text-[11px] font-medium shrink-0 transition-colors cursor-pointer"
-            title={`Удалить таблицу «${currentTable.name}»`}
-          >
-            <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-            <span className="hidden sm:inline">Удалить</span>
-          </button>
-        </div>
-
-        {/* View Mode Switcher: Table | Charts | Split */}
-        <div className="flex items-center bg-slate-900/90 p-0.5 rounded-lg border border-slate-800 shrink-0">
-          <button
-            type="button"
-            onClick={() => setViewMode('table')}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-semibold transition-all cursor-pointer ${
-              viewMode === 'table'
-                ? `${accent.primary} shadow-xs font-bold`
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-            title="Отображение таблицы данных с быстрым копированием ячеек"
-          >
-            <TableIcon className="w-3.5 h-3.5" />
-            <span>Таблица</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setViewMode('charts')}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-semibold transition-all cursor-pointer ${
-              viewMode === 'charts'
-                ? `${accent.primary} shadow-xs font-bold`
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-            title="Графики и визуальная аналитика данных"
-          >
-            <BarChart3 className="w-3.5 h-3.5" />
-            <span>Графики</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setViewMode('split')}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-semibold transition-all cursor-pointer ${
-              viewMode === 'split'
-                ? `${accent.primary} shadow-xs font-bold`
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-            title="Разделенный экран: график сверху, таблица снизу"
-          >
-            <Columns2 className="w-3.5 h-3.5" />
-            <span className="hidden md:inline">Разделенный</span>
-          </button>
-        </div>
-
-        {/* Operations: Import / Export / Add Row */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".xlsx,.xls,.csv"
-            onChange={handleFileUpload}
-            className="hidden"
-          />
-
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isImporting}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded text-[11px] font-medium border transition-colors ${theme.panelSubtle} hover:border-slate-500 text-slate-200 cursor-pointer`}
-            title="Импортировать файл .xlsx или .csv"
-          >
-            <Upload className="w-3 h-3 text-emerald-400" />
-            <span className="hidden sm:inline">Импорт</span>
-          </button>
-
-          <button
-            onClick={() => exportTableToXlsx(currentTable)}
-            className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] border transition-colors ${theme.panelSubtle} hover:border-slate-500 text-slate-300 cursor-pointer`}
-            title="Экспортировать в Excel (.xlsx)"
-          >
-            <Download className="w-3 h-3 text-sky-400" />
-            <span className="hidden sm:inline">XLSX</span>
-          </button>
-
-          <button
-            onClick={() => exportTableToCsv(currentTable)}
-            className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] border transition-colors ${theme.panelSubtle} hover:border-slate-500 text-slate-300 cursor-pointer`}
-            title="Экспортировать в CSV"
-          >
-            <FileText className="w-3 h-3 text-amber-400" />
-            <span className="hidden sm:inline">CSV</span>
-          </button>
-
-          <button
-            onClick={() => setIsAddingRow(true)}
-            className={`flex items-center gap-1 px-3 py-1 rounded text-xs font-semibold shadow-sm ${accent.primary} cursor-pointer`}
-            title="Добавить новую строку в таблицу"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Строка</span>
-          </button>
-        </div>
+        )}
       </div>
 
-      {/* Filter Strip: Search, Tag Pills, Quick-Copy Prompt */}
-      <div className={`p-2 border-b ${theme.border} ${theme.panelSubtle} flex flex-wrap items-center justify-between gap-2 shrink-0`}>
-        {/* Search */}
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
-          <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 opacity-50 pointer-events-none" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Поиск по строкам, значениям, тегам..."
-            className={`w-full pl-8 pr-3 py-1 rounded text-xs border outline-none select-text ${theme.input}`}
-          />
+      {/* Import Error Notice if any */}
+      {importError && (
+        <div className="m-2.5 p-2.5 rounded-lg bg-rose-950/90 border border-rose-500/80 text-rose-200 text-xs flex items-center justify-between gap-2 shadow-md">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+            <span>{importError}</span>
+          </div>
+          <button onClick={() => setImportError(null)} className="text-slate-400 hover:text-white p-0.5 cursor-pointer">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Main Content Area */}
+      {!currentTable ? (
+        <div className={`flex flex-col items-center justify-center flex-1 p-8 text-center select-none ${theme.panel}`}>
+          <FileSpreadsheet className="w-16 h-16 text-slate-500 mb-4 opacity-40" />
+          <h2 className="text-base font-bold text-slate-200 mb-2">Таблицы базы данных отсутствуют</h2>
+          <p className="text-xs text-slate-400 max-w-md mb-6 leading-relaxed">
+            Создайте новую пустую таблицу или импортируйте существующий файл Excel (.xlsx) или .csv с заказами, тарифами или клиентами.
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={() => setIsCreateTableModalOpen(true)}
+              className={`flex items-center gap-1.5 px-5 py-2.5 rounded-lg font-bold text-xs shadow-md transition-transform active:scale-95 cursor-pointer ${accent.primary}`}
+            >
+              <Plus className="w-4 h-4" />
+              <span>Создать таблицу</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isImporting}
+              className="flex items-center gap-1.5 px-5 py-2.5 rounded-lg font-bold text-xs border border-slate-700 bg-slate-800 hover:bg-slate-750 text-slate-200 shadow-md transition-transform active:scale-95 cursor-pointer"
+            >
+              <Upload className="w-4 h-4 text-emerald-400" />
+              <span>{isImporting ? 'Загрузка файла...' : 'Импорт из файла (.xlsx, .csv)'}</span>
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Filter Strip: Search, Tag Pills, Quick-Copy Prompt */}
+          <div className={`p-2 border-b ${theme.border} ${theme.panelSubtle} flex flex-wrap items-center justify-between gap-2 shrink-0`}>
+            {/* Search */}
+            <div className="relative flex-1 min-w-[200px] max-w-sm">
+              <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 opacity-50 pointer-events-none" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Поиск по строкам, значениям, тегам..."
+                className={`w-full pl-8 pr-3 py-1 rounded text-xs border outline-none select-text ${theme.input}`}
+              />
           {searchQuery && (
             <button
               onClick={() => setSearchQuery('')}
@@ -1280,11 +1334,7 @@ export const ExcelTableDatabasePanel: React.FC<ExcelTableDatabasePanelProps> = (
 
                               <button
                                 type="button"
-                                onClick={() => {
-                                  if (confirm('Удалить эту строку из таблицы?')) {
-                                    handleDeleteRow(row.id);
-                                  }
-                                }}
+                                onClick={() => handleDeleteRow(row.id)}
                                 className="p-1 rounded opacity-30 group-hover:opacity-100 hover:text-rose-400 text-slate-400 transition-opacity cursor-pointer"
                                 title="Удалить строку"
                               >
@@ -1318,9 +1368,11 @@ export const ExcelTableDatabasePanel: React.FC<ExcelTableDatabasePanelProps> = (
           </span>
         </div>
       </div>
+      </>
+      )}
 
       {/* Modal: Confirm Table Deletion */}
-      {isDeleteTableModalOpen && (
+      {isDeleteTableModalOpen && currentTable && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
           <div className={`w-full max-w-md rounded-xl border shadow-2xl p-5 ${theme.panel} ${theme.border}`}>
             <div className="flex items-start gap-3">

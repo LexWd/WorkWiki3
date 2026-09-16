@@ -17,6 +17,7 @@ import {
 import { Snippet, PlaceholderConfig, ExcelRow, GuiSettings } from '../types';
 import { getThemeClasses, getAccentClasses, getDensityPadding } from '../utils/theme';
 import { interpolateSnippet } from '../utils/interpolator';
+import { ConfirmDialogModal } from './ConfirmDialogModal';
 
 interface SnippetListPanelProps {
   snippets: Snippet[];
@@ -57,6 +58,7 @@ export const SnippetListPanel: React.FC<SnippetListPanelProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Все');
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
 
   // Adding category inline form
   const [isAddingCategory, setIsAddingCategory] = useState(false);
@@ -89,11 +91,11 @@ export const SnippetListPanel: React.FC<SnippetListPanelProps> = ({
         return matchesTitle || matchesShortcut || matchesContent || matchesTags;
       })
       .sort((a, b) => {
-        // Pinned first
+        // Pinned templates stay on top
         if (a.isPinned && !b.isPinned) return -1;
         if (!a.isPinned && b.isPinned) return 1;
-        // Then by usage count
-        return b.usageCount - a.usageCount;
+        // Static alphabetical sorting by title ascending (А → Я)
+        return a.title.localeCompare(b.title, 'ru', { sensitivity: 'base' });
       });
   }, [snippets, selectedCategory, searchQuery]);
 
@@ -295,10 +297,7 @@ export const SnippetListPanel: React.FC<SnippetListPanelProps> = ({
                       onDeleteCategory(selectedCategory);
                       setSelectedCategory('Все');
                     } else {
-                      if (confirm(`В категории «${selectedCategory}» находится ${currentCategorySnippetCount} шаблонов. Они будут перемещены в «Общее». Удалить категорию?`)) {
-                        onDeleteCategory(selectedCategory, 'Общее');
-                        setSelectedCategory('Все');
-                      }
+                      setCategoryToDelete(selectedCategory);
                     }
                   }}
                   className="flex items-center gap-1 text-rose-400 hover:text-rose-300 hover:underline cursor-pointer"
@@ -485,6 +484,31 @@ export const SnippetListPanel: React.FC<SnippetListPanelProps> = ({
         </span>
         <span className="text-slate-500 font-mono">Alt+1..9 быстрый выбор</span>
       </div>
+
+      {/* Confirmation: Delete Category */}
+      <ConfirmDialogModal
+        isOpen={categoryToDelete !== null}
+        title="Удалить категорию?"
+        description={
+          categoryToDelete ? (
+            <div>
+              В категории <strong className="text-rose-300">«{categoryToDelete}»</strong> находится {snippets.filter(s => s.category === categoryToDelete).length} шаблонов. Они будут перемещены в категорию «Общее». Удалить категорию?
+            </div>
+          ) : null
+        }
+        confirmText="Удалить и переместить шаблоны"
+        cancelText="Отмена"
+        variant="danger"
+        icon="trash"
+        onConfirm={() => {
+          if (categoryToDelete) {
+            onDeleteCategory(categoryToDelete, 'Общее');
+            setSelectedCategory('Все');
+            setCategoryToDelete(null);
+          }
+        }}
+        onCancel={() => setCategoryToDelete(null)}
+      />
     </div>
   );
 };

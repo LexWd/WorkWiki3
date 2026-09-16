@@ -17,6 +17,7 @@ interface NoteEditorModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (note: NoteCard) => void;
+  onDelete?: (id: string) => void;
   note: NoteCard | null;
   settings: GuiSettings;
   availableCategories: string[];
@@ -35,6 +36,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
   isOpen,
   onClose,
   onSave,
+  onDelete,
   note,
   settings,
   availableCategories,
@@ -72,7 +74,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
     }
     setTagInput('');
     setNewChecklistText('');
-  }, [note, isOpen, availableCategories]);
+  }, [note, isOpen]);
 
   if (!isOpen) return null;
 
@@ -114,13 +116,13 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() && !content.trim()) return;
+    if (!title.trim() && !content.trim() && checklist.length === 0) return;
 
     const savedNote: NoteCard = {
       id: note ? note.id : `note-${Date.now()}`,
       title: title.trim() || 'Без названия',
       content: content.trim(),
-      category: category.trim() || 'Разное',
+      category: category.trim() || 'Текущая смена',
       color,
       isPinned,
       tags,
@@ -399,24 +401,43 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
         </form>
 
         {/* Footer */}
-        <div className={`p-3 border-t flex items-center justify-end gap-2 ${theme.panelHeader} ${theme.border}`}>
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-1.5 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs"
-          >
-            Отмена
-          </button>
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={!title.trim() && !content.trim()}
-            className={`px-5 py-1.5 rounded-lg font-bold text-xs shadow-md ${accent.primary} ${
-              !title.trim() && !content.trim() ? 'opacity-50 cursor-not-allowed' : ''
-            }`}
-          >
-            Сохранить карточку
-          </button>
+        <div className={`p-3 border-t flex items-center justify-between gap-2 ${theme.panelHeader} ${theme.border}`}>
+          {note && onDelete ? (
+            <button
+              type="button"
+              onClick={() => {
+                onDelete(note.id);
+                onClose();
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-rose-800/60 bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 font-semibold text-xs transition-colors cursor-pointer"
+              title="Удалить эту заметку"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+              <span>Удалить</span>
+            </button>
+          ) : (
+            <div />
+          )}
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-1.5 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs cursor-pointer"
+            >
+              Отмена
+            </button>
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={!title.trim() && !content.trim() && checklist.length === 0}
+              className={`px-5 py-1.5 rounded-lg font-bold text-xs shadow-md ${accent.primary} ${
+                !title.trim() && !content.trim() && checklist.length === 0 ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+              }`}
+            >
+              Сохранить карточку
+            </button>
+          </div>
         </div>
       </div>
     </div>

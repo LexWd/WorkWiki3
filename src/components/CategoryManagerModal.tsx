@@ -15,6 +15,7 @@ import { Snippet, GuiSettings } from '../types';
 import { getThemeClasses, getAccentClasses } from '../utils/theme';
 import { DEFAULT_CATEGORY_LIST } from '../data/defaultData';
 import { soundService } from '../utils/sound';
+import { ConfirmDialogModal } from './ConfirmDialogModal';
 
 interface CategoryManagerModalProps {
   isOpen: boolean;
@@ -43,6 +44,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
   const [reassignTarget, setReassignTarget] = useState<string>('Общее');
+  const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
   const [editingCat, setEditingCat] = useState<string | null>(null);
   const [editingName, setEditingName] = useState<string>('');
 
@@ -375,12 +377,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
         <div className={`p-3 border-t ${theme.border} ${theme.panelHeader} flex items-center justify-between gap-2`}>
           <button
             type="button"
-            onClick={() => {
-              if (confirm('Сбросить список категорий к исходным стандартным? Пользовательские категории будут удалены, а стандартные восстановлены.')) {
-                onResetCategories();
-                soundService.playSuccess(settings.soundEffects);
-              }
-            }}
+            onClick={() => setIsResetConfirmOpen(true)}
             className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200 transition-colors cursor-pointer px-2 py-1 rounded hover:bg-slate-800/60"
             title="Восстановить исходный список стандартных категорий"
           >
@@ -397,6 +394,23 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Confirmation: Reset categories */}
+      <ConfirmDialogModal
+        isOpen={isResetConfirmOpen}
+        title="Сбросить список категорий?"
+        description="Сбросить список категорий к исходным стандартным? Пользовательские категории будут удалены, а стандартные восстановлены."
+        confirmText="Сбросить категории"
+        cancelText="Отмена"
+        variant="warning"
+        icon="reset"
+        onConfirm={() => {
+          onResetCategories();
+          soundService.playSuccess(settings.soundEffects);
+          setIsResetConfirmOpen(false);
+        }}
+        onCancel={() => setIsResetConfirmOpen(false)}
+      />
     </div>
   );
 };

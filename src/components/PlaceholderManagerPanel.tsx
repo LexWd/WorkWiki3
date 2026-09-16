@@ -18,6 +18,7 @@ import { PlaceholderConfig, PlaceholderType, ExcelTable, GuiSettings } from '../
 import { getThemeClasses, getAccentClasses } from '../utils/theme';
 import { soundService } from '../utils/sound';
 import { DEFAULT_PLACEHOLDERS } from '../data/defaultData';
+import { ConfirmDialogModal } from './ConfirmDialogModal';
 
 interface PlaceholderManagerPanelProps {
   placeholders: PlaceholderConfig[];
@@ -34,6 +35,8 @@ export const PlaceholderManagerPanel: React.FC<PlaceholderManagerPanelProps> = (
 }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isCreatingNew, setIsCreatingNew] = useState(false);
+  const [idToDelete, setIdToDelete] = useState<string | null>(null);
+  const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
 
   // Form states for creating / editing
   const [formKey, setFormKey] = useState('');
@@ -133,16 +136,11 @@ export const PlaceholderManagerPanel: React.FC<PlaceholderManagerPanelProps> = (
   };
 
   const handleDelete = (id: string) => {
-    if (confirm('Удалить этот плейсхолдер?')) {
-      onUpdatePlaceholders(placeholders.filter((p) => p.id !== id));
-    }
+    setIdToDelete(id);
   };
 
   const handleResetDefaults = () => {
-    if (confirm('Сбросить плейсхолдеры к стандартным заводским значениям?')) {
-      onUpdatePlaceholders(DEFAULT_PLACEHOLDERS);
-      soundService.playCopyChime(settings.soundEffects);
-    }
+    setIsResetConfirmOpen(true);
   };
 
   return (
@@ -502,6 +500,54 @@ export const PlaceholderManagerPanel: React.FC<PlaceholderManagerPanelProps> = (
           </div>
         )}
       </div>
+
+      {/* Confirmation: Delete placeholder */}
+      <ConfirmDialogModal
+        isOpen={idToDelete !== null}
+        title="Удалить плейсхолдер?"
+        description={
+          idToDelete ? (
+            <div>
+              Вы действительно хотите удалить плейсхолдер{' '}
+              <strong className="text-rose-300 font-mono">
+                {"{{" + (placeholders.find((p) => p.id === idToDelete)?.key || '') + "}}"}
+              </strong>?
+            </div>
+          ) : null
+        }
+        confirmText="Удалить"
+        cancelText="Отмена"
+        variant="danger"
+        icon="trash"
+        onConfirm={() => {
+          if (idToDelete) {
+            onUpdatePlaceholders(placeholders.filter((p) => p.id !== idToDelete));
+            if (editingId === idToDelete) {
+              cancelForm();
+            }
+            setIdToDelete(null);
+            soundService.playClick(settings.soundEffects);
+          }
+        }}
+        onCancel={() => setIdToDelete(null)}
+      />
+
+      {/* Confirmation: Reset placeholders */}
+      <ConfirmDialogModal
+        isOpen={isResetConfirmOpen}
+        title="Сбросить плейсхолдеры?"
+        description="Восстановить стандартные заводские плейсхолдеры? Все добавленные вручную параметры будут заменены."
+        confirmText="Сбросить"
+        cancelText="Отмена"
+        variant="warning"
+        icon="reset"
+        onConfirm={() => {
+          onUpdatePlaceholders(DEFAULT_PLACEHOLDERS);
+          setIsResetConfirmOpen(false);
+          soundService.playCopyChime(settings.soundEffects);
+        }}
+        onCancel={() => setIsResetConfirmOpen(false)}
+      />
     </div>
   );
 };

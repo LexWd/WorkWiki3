@@ -155,9 +155,11 @@ export default function App() {
     };
   }, [isResizingSidebar, sidebarWidth]);
 
-  // Toast notification helper
+  // Toast notification helper with guaranteed uniqueness
+  const toastCounterRef = useRef(0);
   const showToast = useCallback((title: string, preview: string) => {
-    const id = 'toast-' + Date.now();
+    toastCounterRef.current += 1;
+    const id = `toast-${Date.now()}-${toastCounterRef.current}-${Math.random().toString(36).slice(2, 7)}`;
     setToasts((prev) => [...prev, { id, title, preview }]);
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -338,7 +340,7 @@ export default function App() {
         showToast('Шаблон обновлен', `«${data.title}» сохранено`);
       } else {
         const newSnip: Snippet = {
-          id: 'snip-' + Date.now(),
+          id: `snip-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
           title: data.title,
           shortcut: data.shortcut,
           category: data.category,
@@ -403,11 +405,18 @@ export default function App() {
 
   // Notes CRUD handlers
   const handleCreateNote = useCallback(
-    (data: Omit<NoteCard, 'id' | 'createdAt' | 'updatedAt'>) => {
+    (data: Partial<NoteCard> & { title?: string; content?: string }) => {
       const newNote: NoteCard = {
+        title: data.title || 'Новая заметка',
+        content: data.content || '',
+        category: data.category || 'Текущая смена',
+        color: data.color || 'amber',
+        isPinned: Boolean(data.isPinned),
+        tags: data.tags || [],
+        checklist: data.checklist,
         ...data,
-        id: 'note-' + Date.now(),
-        createdAt: Date.now(),
+        id: data.id || `note-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        createdAt: data.createdAt || Date.now(),
         updatedAt: Date.now(),
       };
       setNotes((prev) => [newNote, ...prev]);
@@ -417,9 +426,15 @@ export default function App() {
     [settings.soundEffects, showToast]
   );
 
-  const handleUpdateNote = useCallback((id: string, partial: Partial<NoteCard>) => {
+  const handleUpdateNote = useCallback((updatedOrId: NoteCard | string, partial?: Partial<NoteCard>) => {
     setNotes((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, ...partial, updatedAt: Date.now() } : n))
+      prev.map((n) => {
+        if (typeof updatedOrId === 'string') {
+          return n.id === updatedOrId ? { ...n, ...partial, updatedAt: Date.now() } : n;
+        } else {
+          return n.id === updatedOrId.id ? { ...updatedOrId, updatedAt: Date.now() } : n;
+        }
+      })
     );
   }, []);
 
@@ -682,9 +697,6 @@ export default function App() {
                   selectedSnippetId={selectedSnippet?.id || null}
                   onSelectSnippet={(s) => {
                     setSelectedSnippet(s);
-                    if (settings.autoCopyOnSelect) {
-                      handleCopySnippet(s);
-                    }
                   }}
                   categories={categories}
                   onAddCategory={handleAddCategory}
@@ -776,6 +788,7 @@ export default function App() {
             <div className="flex-1 h-full overflow-hidden min-w-0">
               <NotesManagerPanel
                 notes={notes}
+                onAddNote={handleCreateNote}
                 onCreateNote={handleCreateNote}
                 onUpdateNote={handleUpdateNote}
                 onDeleteNote={handleDeleteNote}
@@ -783,6 +796,7 @@ export default function App() {
                 onToggleChecklistItem={handleToggleChecklistItem}
                 settings={settings}
                 onCopyText={(text, title) => handleCopyResolvedText(text, title)}
+                onNotification={(msg) => showToast('Заметки', msg)}
               />
             </div>
           )}

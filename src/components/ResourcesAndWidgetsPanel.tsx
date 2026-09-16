@@ -34,6 +34,7 @@ import {
 import { ResourceWidget, WidgetType, WidgetIconType, GuiSettings } from '../types';
 import { getThemeClasses, getAccentClasses } from '../utils/theme';
 import { soundService } from '../utils/sound';
+import { ConfirmDialogModal } from './ConfirmDialogModal';
 
 interface ResourcesAndWidgetsPanelProps {
   widgets: ResourceWidget[];
@@ -92,6 +93,7 @@ export const ResourcesAndWidgetsPanel: React.FC<ResourcesAndWidgetsPanelProps> =
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingWidget, setEditingWidget] = useState<ResourceWidget | null>(null);
   const [modalError, setModalError] = useState<string | null>(null);
+  const [widgetToDelete, setWidgetToDelete] = useState<ResourceWidget | null>(null);
 
   // Form State
   const [formTitle, setFormTitle] = useState('');
@@ -297,10 +299,7 @@ export const ResourcesAndWidgetsPanel: React.FC<ResourcesAndWidgetsPanelProps> =
   // Delete widget
   const handleDelete = (widget: ResourceWidget, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm(`Удалить «${widget.title}» из дэшборда?`)) {
-      onDeleteWidget(widget.id);
-      soundService.playClick(settings.soundEffects);
-    }
+    setWidgetToDelete(widget);
   };
 
   // Resize iframe height dynamically
@@ -1046,6 +1045,31 @@ export const ResourcesAndWidgetsPanel: React.FC<ResourcesAndWidgetsPanelProps> =
           </div>
         </div>
       )}
+
+      {/* Confirmation Modal for Widget Deletion */}
+      <ConfirmDialogModal
+        isOpen={widgetToDelete !== null}
+        title="Удалить ресурс из дэшборда?"
+        description={
+          widgetToDelete ? (
+            <div>
+              Вы действительно хотите удалить виджет <strong className="text-rose-300">«{widgetToDelete.title}»</strong> из панели быстрого доступа?
+            </div>
+          ) : null
+        }
+        confirmText="Удалить виджет"
+        cancelText="Отмена"
+        variant="danger"
+        icon="trash"
+        onConfirm={() => {
+          if (widgetToDelete) {
+            onDeleteWidget(widgetToDelete.id);
+            soundService.playClick(settings.soundEffects);
+            setWidgetToDelete(null);
+          }
+        }}
+        onCancel={() => setWidgetToDelete(null)}
+      />
     </div>
   );
 };

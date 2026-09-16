@@ -31,6 +31,7 @@ import {
 import { getThemeClasses, getAccentClasses } from '../utils/theme';
 import { SnippetExportModal } from './SnippetExportModal';
 import { SnippetImportModal } from './SnippetImportModal';
+import { ConfirmDialogModal } from './ConfirmDialogModal';
 
 interface GuiCustomizationModalProps {
   isOpen: boolean;
@@ -84,6 +85,7 @@ export const GuiCustomizationModal: React.FC<GuiCustomizationModalProps> = ({
   const [isExportCollectionOpen, setIsExportCollectionOpen] = useState(false);
   const [isImportCollectionOpen, setIsImportCollectionOpen] = useState(false);
   const [selectedCategoryForExport, setSelectedCategoryForExport] = useState<string>('Все');
+  const [isResetAllConfirmOpen, setIsResetAllConfirmOpen] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const theme = getThemeClasses(settings.theme);
@@ -503,12 +505,8 @@ export const GuiCustomizationModal: React.FC<GuiCustomizationModalProps> = ({
 
                     <button
                       type="button"
-                      onClick={() => {
-                        if (confirm('Сбросить все шаблоны, заметки, таблицы и настройки к начальному состоянию?')) {
-                          onResetData();
-                        }
-                      }}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-rose-800/60 bg-rose-900/40 hover:bg-rose-900/80 text-rose-200 text-xs font-semibold shrink-0"
+                      onClick={() => setIsResetAllConfirmOpen(true)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-rose-800/60 bg-rose-900/40 hover:bg-rose-900/80 text-rose-200 text-xs font-semibold shrink-0 cursor-pointer"
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
                       <span>Сбросить всё</span>
@@ -569,6 +567,22 @@ export const GuiCustomizationModal: React.FC<GuiCustomizationModalProps> = ({
           onNotify={(title, msg) => onNotification?.(`${title}: ${msg}`)}
         />
       )}
+
+      {/* Confirmation: Reset All Data */}
+      <ConfirmDialogModal
+        isOpen={isResetAllConfirmOpen}
+        title="Сбросить все данные приложения?"
+        description="Сбросить все шаблоны, заметки, таблицы и настройки к начальному состоянию? Текущие данные будут стёрты и восстановлены начальные базы."
+        confirmText="Сбросить всё к начальным"
+        cancelText="Отмена"
+        variant="danger"
+        icon="reset"
+        onConfirm={() => {
+          onResetData();
+          setIsResetAllConfirmOpen(false);
+        }}
+        onCancel={() => setIsResetAllConfirmOpen(false)}
+      />
     </>
   );
 };

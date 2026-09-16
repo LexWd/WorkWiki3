@@ -21,9 +21,9 @@ export const ToastNotice: React.FC<ToastNoticeProps> = ({ toasts, settings }) =>
 
   return (
     <div className="fixed bottom-12 right-6 z-50 flex flex-col gap-2 pointer-events-none">
-      {toasts.map((toast) => (
+      {toasts.map((toast, idx) => (
         <div
-          key={toast.id}
+          key={`${toast.id}-${idx}`}
           className={`p-3 rounded-lg border shadow-2xl flex items-start gap-2.5 max-w-sm backdrop-blur-md animate-slide-up pointer-events-auto ${theme.panel} ${theme.border}`}
         >
           <div className="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0 mt-0.5">
