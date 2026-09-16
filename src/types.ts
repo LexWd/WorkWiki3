@@ -1,0 +1,174 @@
+export type SnippetCategory =
+  | 'Приветствие и начало'
+  | 'Заказы и доставка'
+  | 'Возвраты и компенсации'
+  | 'Техническая поддержка'
+  | 'Оплата и счета'
+  | 'Эскалации'
+  | 'Завершение диалога';
+
+export interface Snippet {
+  id: string;
+  title: string;
+  shortcut: string; // e.g. "/привет", "/доставка"
+  category: string;
+  content: string;
+  tags: string[];
+  hotkey?: string; // e.g. "Alt+1"
+  isPinned: boolean;
+  usageCount: number;
+  updatedAt: number;
+}
+
+export type ImportSnippetMode = 'merge' | 'replace_category' | 'replace_all';
+
+export interface SnippetCollectionExport {
+  format: 'smart-desk-snippet-collection';
+  version: number;
+  collectionName: string;
+  category: string;
+  description?: string;
+  exportedAt: string;
+  count: number;
+  snippets: Snippet[];
+}
+
+export type PlaceholderType = 'text' | 'choice';
+
+export interface PlaceholderConfig {
+  id: string;
+  key: string; // e.g. "имя_клиента", "служба_доставки"
+  label: string; // e.g. "Служба доставки"
+  description: string;
+  type: PlaceholderType; // 'text' or 'choice' (multiple choice)
+  options?: string[]; // for multiple choice
+  defaultValue: string;
+  excelColumnBinding?: string; // linked to Excel column name
+}
+
+export interface ExcelColumn {
+  id: string;
+  name: string;
+  key: string;
+}
+
+export interface ExcelRow {
+  id: string;
+  tags: string[]; // теги для быстрого поиска и фильтрации
+  data: Record<string, string>;
+  notes?: string;
+}
+
+export interface ExcelTable {
+  id: string;
+  name: string;
+  description: string;
+  columns: ExcelColumn[];
+  rows: ExcelRow[];
+  updatedAt: number;
+}
+
+export type AppTheme = 'dark-slate' | 'obsidian' | 'light-minimal' | 'cyber-espresso';
+export type AccentColor = 'indigo' | 'emerald' | 'sky' | 'amber' | 'rose' | 'violet';
+export type InterfaceDensity = 'compact' | 'comfortable' | 'spacious';
+export type FontSizeScale = 'sm' | 'base' | 'lg';
+export type WindowMode = 'full' | 'mini-bar';
+export type ActiveTab = 'snippets' | 'excel' | 'placeholders' | 'resources' | 'notes';
+
+export type NoteCardColor = 'slate' | 'amber' | 'blue' | 'emerald' | 'rose' | 'purple';
+
+export interface NoteChecklistItem {
+  id: string;
+  text: string;
+  completed: boolean;
+}
+
+export interface NoteCard {
+  id: string;
+  title: string;
+  content: string;
+  category: string;
+  color: NoteCardColor;
+  isPinned: boolean;
+  tags: string[];
+  checklist?: NoteChecklistItem[];
+  createdAt: number;
+  updatedAt: number;
+}
+
+export type WidgetType = 'iframe' | 'link';
+
+export type WidgetIconType = 
+  | 'globe' 
+  | 'truck' 
+  | 'map-pin' 
+  | 'book-open' 
+  | 'calculator' 
+  | 'package' 
+  | 'message-square' 
+  | 'headphones' 
+  | 'file-text' 
+  | 'shield-check' 
+  | 'sparkles' 
+  | 'search' 
+  | 'database' 
+  | 'layers';
+
+export interface ResourceWidget {
+  id: string;
+  title: string;
+  url: string;
+  type: WidgetType; // 'iframe' or 'link'
+  category: string; // 'Логистика и трекинг' | 'Карты и гео' | 'Базы знаний' | 'Утилиты' | 'CRM и системы';
+  description?: string;
+  tags: string[];
+  isPinned?: boolean;
+  notes?: string;
+  icon?: WidgetIconType;
+  iconColor?: string; // e.g. 'sky' | 'emerald' | 'amber' | 'purple' | 'rose' | 'blue'
+  iframeHeight?: number; // Height in pixels for adjustable iframes (e.g. 280, 420, 600)
+  iframeWidth?: 'full' | 'half'; // Grid span
+  isCollapsed?: boolean;
+  createdAt: number;
+}
+
+export interface GuiSettings {
+  theme: AppTheme;
+  accentColor: AccentColor;
+  density: InterfaceDensity;
+  fontSize: FontSizeScale;
+  windowMode: WindowMode;
+  soundEffects: boolean;
+  autoCopyOnSelect: boolean;
+  offlineModeForced: boolean;
+  agentName: string;
+  sidebarWidth?: number; // Resizable snippet panel width in px
+  composerHeight?: number; // Resizable template composer input height in px
+}
+
+export interface ProductivityMetrics {
+  snippetsUsedCount: number;
+  wordsSaved: number;
+  keystrokesSaved: number;
+  timeSavedSeconds: number;
+  sessionStartTime: number;
+}
+
+export interface ElectronAPI {
+  isElectron: boolean;
+  platform: string;
+  minimize: () => Promise<void>;
+  maximize: () => Promise<void>;
+  close: () => Promise<void>;
+  isMaximized: () => Promise<boolean>;
+  toggleAlwaysOnTop: () => Promise<boolean>;
+  getAlwaysOnTop: () => Promise<boolean>;
+  getAppVersion: () => Promise<string>;
+}
+
+declare global {
+  interface Window {
+    electronAPI?: ElectronAPI;
+  }
+}
+

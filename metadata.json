@@ -1,0 +1,6 @@
+{
+  "name": "QuickReply Desk",
+  "description": "Десктопное рабочее место оператора поддержки: шаблоны и быстрые ответы, настраиваемые плейсхолдеры с множественным выбором, Excel-база данных с тегами и горячие клавиши.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
