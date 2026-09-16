@@ -37,18 +37,19 @@
   scrollbar-width: none;
 }
 
-/* Dynamic Font Scaling */
-html[data-font-size="sm"], body[data-font-size="sm"] {
-  font-size: 13.5px;
-  zoom: 0.92;
-}
-
-html[data-font-size="base"], body[data-font-size="base"] {
+/* Dynamic Font Scaling without viewport distortion */
+html {
   font-size: 15px;
-  zoom: 1;
 }
 
-html[data-font-size="lg"], body[data-font-size="lg"] {
+html[data-font-size="sm"] {
+  font-size: 13px;
+}
+
+html[data-font-size="base"] {
+  font-size: 15px;
+}
+
+html[data-font-size="lg"] {
   font-size: 17px;
-  zoom: 1.1;
 }

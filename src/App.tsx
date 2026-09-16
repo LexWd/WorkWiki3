@@ -543,7 +543,7 @@ export default function App() {
     <div 
       data-density={settings.density}
       data-font-size={settings.fontSize}
-      className={`h-screen w-screen flex flex-col ${theme.bgApp} ${fontScale} overflow-hidden font-sans select-none`}
+      className={`fixed inset-0 h-full w-full flex flex-col ${theme.bgApp} ${fontScale} overflow-hidden font-sans select-none`}
     >
       {/* Desktop Header Bar */}
       <DesktopHeader

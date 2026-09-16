@@ -134,7 +134,7 @@ export function getDensityPadding(density: InterfaceDensity) {
         button: 'px-2 py-1 text-xs',
         gap: 'gap-1.5',
         spaceY: 'space-y-1',
-        headerHeight: 'h-9',
+        headerHeight: 'min-h-[2.25rem] py-1',
         badge: 'py-0.2 px-1 text-[10px]',
       };
     case 'spacious':
@@ -147,7 +147,7 @@ export function getDensityPadding(density: InterfaceDensity) {
         button: 'px-4 py-2 text-sm',
         gap: 'gap-3.5',
         spaceY: 'space-y-3',
-        headerHeight: 'h-12',
+        headerHeight: 'min-h-[3.25rem] py-2',
         badge: 'py-1 px-2 text-xs',
       };
     case 'comfortable':
@@ -161,7 +161,7 @@ export function getDensityPadding(density: InterfaceDensity) {
         button: 'px-3 py-1.5 text-xs',
         gap: 'gap-2.5',
         spaceY: 'space-y-2',
-        headerHeight: 'h-11',
+        headerHeight: 'min-h-[2.75rem] py-1.5',
         badge: 'py-0.5 px-1.5 text-[10.5px]',
       };
   }

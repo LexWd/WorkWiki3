@@ -54,22 +54,27 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({
   const density = getDensityPadding(settings.density);
 
   return (
-    <header className={`${density.headerHeight} px-3 border-b ${theme.border} ${theme.panelHeader} flex items-center justify-between gap-2 shrink-0 select-none min-w-0 overflow-hidden`}>
+    <header className={`${density.headerHeight} px-3 border-b ${theme.border} ${theme.panelHeader} flex items-center justify-between gap-2 shrink-0 select-none w-full min-w-0`}>
       {/* Brand & Tabs */}
-      <div className="flex items-center gap-2 sm:gap-3 min-w-0 overflow-hidden">
-        {/* App Logo */}
-        <div className="flex items-center gap-2 shrink-0">
-          <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs shadow-sm ${accent.primary}`}>
+      <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1 overflow-hidden">
+        {/* App Logo & Home trigger */}
+        <button
+          type="button"
+          onClick={() => onSelectTab('snippets')}
+          className="flex items-center gap-2 shrink-0 text-left rounded-lg p-0.5 group cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 transition-opacity hover:opacity-90"
+          title="QuickReply Desk — Главная / Шаблоны ответов (Ctrl+1)"
+        >
+          <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs shadow-sm transition-transform group-hover:scale-105 ${accent.primary}`}>
             <Zap className="w-4 h-4 fill-current" />
           </div>
           <div className="hidden md:block shrink-0">
-            <h1 className="font-bold text-xs text-slate-100 leading-tight">QuickReply Desk</h1>
+            <h1 className="font-bold text-xs text-slate-100 leading-tight group-hover:text-white transition-colors">QuickReply Desk</h1>
             <span className="text-[9.5px] font-mono text-slate-400 block">v2.0</span>
           </div>
-        </div>
+        </button>
 
         {/* Navigation Tabs */}
-        <nav className="flex items-center gap-0.5 sm:gap-1 bg-slate-900/90 p-0.5 rounded-lg border border-slate-800 overflow-x-auto no-scrollbar min-w-0">
+        <nav className="flex items-center gap-0.5 sm:gap-1 bg-slate-900/90 p-0.5 rounded-lg border border-slate-800 overflow-x-auto no-scrollbar min-w-0 flex-1 sm:flex-initial">
           <button
             onClick={() => onSelectTab('snippets')}
             className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-md text-xs font-semibold whitespace-nowrap transition-all shrink-0 ${
@@ -154,16 +159,17 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({
         ) : null}
       </div>
 
-      {/* Right: Quick Tools & Settings */}
-      <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+      {/* Right: Quick Tools & Settings (Always pinned to right and non-shrinking) */}
+      <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 ml-auto z-10">
         {/* Quick Search / Command Palette trigger */}
         <button
+          type="button"
           onClick={onOpenPalette}
-          className="flex items-center gap-1.5 px-2 py-1 rounded-lg border border-slate-700/80 bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-xs transition-colors"
+          className="flex items-center gap-1.5 px-2 py-1 rounded-lg border border-slate-700/80 bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-xs transition-colors shrink-0"
           title="Быстрый поиск шаблонов (Ctrl+K или /)"
         >
           <Search className="w-3.5 h-3.5 text-sky-400" />
-          <span className="hidden sm:inline">Поиск</span>
+          <span className="hidden lg:inline">Поиск</span>
           <kbd className="hidden md:inline-block font-mono text-[10px] bg-black/30 px-1 py-0.2 rounded border border-slate-700 text-slate-400">
             Ctrl+K
           </kbd>
@@ -171,8 +177,9 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({
 
         {/* Shortcuts Cheat Sheet */}
         <button
+          type="button"
           onClick={onOpenShortcuts}
-          className="p-1.5 rounded-lg border border-slate-700/80 hover:bg-slate-800 text-slate-300 transition-colors"
+          className="p-1.5 rounded-lg border border-slate-700/80 hover:bg-slate-800 text-slate-300 transition-colors shrink-0"
           title="Горячие клавиши (нажмите ?)"
         >
           <Keyboard className="w-3.5 h-3.5" />
@@ -180,8 +187,9 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({
 
         {/* Mini Mode Toggle */}
         <button
+          type="button"
           onClick={onToggleMiniMode}
-          className={`p-1.5 rounded-lg border transition-colors ${
+          className={`p-1.5 rounded-lg border transition-colors shrink-0 ${
             isMiniMode
               ? `${accent.primary}`
               : 'border-slate-700/80 hover:bg-slate-800 text-slate-300'
@@ -193,15 +201,16 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({
 
         {/* GUI Customization Settings */}
         <button
+          type="button"
           onClick={onOpenSettings}
-          className="p-1.5 rounded-lg border border-slate-700/80 hover:bg-slate-800 text-slate-300 transition-colors"
+          className="p-1.5 rounded-lg border border-slate-700/80 hover:bg-slate-800 text-slate-300 transition-colors shrink-0"
           title="Настройки интерфейса и темы"
         >
           <Settings className="w-3.5 h-3.5" />
         </button>
 
         {/* Operator Profile */}
-        <div className="hidden xl:flex items-center gap-1.5 pl-2 border-l border-slate-800 text-xs text-slate-300">
+        <div className="hidden 2xl:flex items-center gap-1.5 pl-2 border-l border-slate-800 text-xs text-slate-300 shrink-0">
           <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
           <span className="truncate max-w-[110px] font-medium">{settings.agentName}</span>
         </div>
