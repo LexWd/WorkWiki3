@@ -72,6 +72,11 @@ class SoundService {
     this.playCopyChime(enabled);
   }
 
+  // Alias for success sound
+  playSuccess(enabled: boolean = true) {
+    this.playCopyChime(enabled);
+  }
+
   // Shortcut triggered cue
   playShortcutPop(enabled: boolean = true) {
     if (!enabled) return;

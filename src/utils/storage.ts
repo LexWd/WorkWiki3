@@ -6,7 +6,8 @@ import {
   DEFAULT_GUI_SETTINGS, 
   DEFAULT_METRICS,
   DEFAULT_RESOURCE_WIDGETS,
-  DEFAULT_NOTE_CARDS
+  DEFAULT_NOTE_CARDS,
+  DEFAULT_CATEGORY_LIST
 } from '../data/defaultData';
 
 const SNIPPETS_KEY = 'quickreply_ru_snippets_v2';
@@ -16,28 +17,56 @@ const SETTINGS_KEY = 'quickreply_ru_settings_v2';
 const METRICS_KEY = 'quickreply_ru_metrics_v2';
 const WIDGETS_KEY = 'quickreply_ru_widgets_v2';
 const NOTES_KEY = 'quickreply_ru_notes_v2';
-const CATEGORIES_KEY = 'quickreply_ru_custom_categories_v2';
+const ALL_CATEGORIES_KEY = 'quickreply_ru_all_categories_v3';
+const LEGACY_CUSTOM_CATEGORIES_KEY = 'quickreply_ru_custom_categories_v2';
 
 export const storage = {
-  loadCustomCategories(): string[] {
+  loadCategories(): string[] {
     try {
-      const data = localStorage.getItem(CATEGORIES_KEY);
+      const data = localStorage.getItem(ALL_CATEGORIES_KEY);
       if (data) {
         const parsed = JSON.parse(data);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+      // Check legacy custom categories and merge if first time
+      const legacyData = localStorage.getItem(LEGACY_CUSTOM_CATEGORIES_KEY);
+      if (legacyData) {
+        const legacyParsed = JSON.parse(legacyData);
+        if (Array.isArray(legacyParsed) && legacyParsed.length > 0) {
+          const merged = Array.from(new Set([...DEFAULT_CATEGORY_LIST, ...legacyParsed]));
+          this.saveCategories(merged);
+          return merged;
+        }
       }
     } catch (e) {
-      console.warn('Failed to load custom categories:', e);
+      console.warn('Failed to load categories:', e);
     }
-    return [];
+    return [...DEFAULT_CATEGORY_LIST];
+  },
+
+  saveCategories(categories: string[]) {
+    try {
+      localStorage.setItem(ALL_CATEGORIES_KEY, JSON.stringify(categories));
+    } catch (e) {
+      console.error('Failed to save categories:', e);
+    }
+  },
+
+  resetCategories(): string[] {
+    try {
+      localStorage.setItem(ALL_CATEGORIES_KEY, JSON.stringify(DEFAULT_CATEGORY_LIST));
+    } catch (e) {
+      console.error('Failed to reset categories:', e);
+    }
+    return [...DEFAULT_CATEGORY_LIST];
+  },
+
+  loadCustomCategories(): string[] {
+    return this.loadCategories();
   },
 
   saveCustomCategories(categories: string[]) {
-    try {
-      localStorage.setItem(CATEGORIES_KEY, JSON.stringify(categories));
-    } catch (e) {
-      console.error('Failed to save custom categories:', e);
-    }
+    this.saveCategories(categories);
   },
   loadSnippets(): Snippet[] {
     try {
@@ -252,6 +281,7 @@ export const storage = {
     localStorage.removeItem(NOTES_KEY);
     localStorage.removeItem(SETTINGS_KEY);
     localStorage.removeItem(METRICS_KEY);
-    localStorage.removeItem(CATEGORIES_KEY);
+    localStorage.removeItem(ALL_CATEGORIES_KEY);
+    localStorage.removeItem(LEGACY_CUSTOM_CATEGORIES_KEY);
   },
 };

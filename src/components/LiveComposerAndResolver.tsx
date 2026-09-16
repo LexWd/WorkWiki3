@@ -90,16 +90,16 @@ export const LiveComposerAndResolver: React.FC<LiveComposerAndResolverProps> = (
     return extractTokens(inputText);
   }, [inputText]);
 
-  // Calculate live resolved text
+  // Calculate live resolved text (Excel tables are decoupled from templates)
   const { result: resolvedText, unresolved } = useMemo(() => {
     return interpolateSnippet(
       inputText,
       placeholders,
-      activeRow,
+      null,
       settings.agentName,
       tokenOverrides
     );
-  }, [inputText, placeholders, activeRow, settings.agentName, tokenOverrides]);
+  }, [inputText, placeholders, settings.agentName, tokenOverrides]);
 
   // Slash commands filtering
   const matchingSlashSnippets = useMemo(() => {
@@ -340,11 +340,6 @@ export const LiveComposerAndResolver: React.FC<LiveComposerAndResolverProps> = (
                 <ListOrdered className="w-3.5 h-3.5 text-purple-400" />
                 Настройка значений плейсхолдеров ({detectedTokens.length}):
               </span>
-              {activeRow && (
-                <span className="text-[10px] text-emerald-400 font-medium flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3" /> Привязано к выбранной строке Excel
-                </span>
-              )}
             </div>
 
             <div className="space-y-2.5">
@@ -355,14 +350,13 @@ export const LiveComposerAndResolver: React.FC<LiveComposerAndResolverProps> = (
                 const currentVal = resolveTokenValue(
                   tokenKey,
                   placeholders,
-                  activeRow,
+                  null,
                   settings.agentName,
                   tokenOverrides
                 );
 
                 const isChoice = config?.type === 'choice' && config.options && config.options.length > 0;
                 const isOverridden = tokenKey in tokenOverrides;
-                const isBoundToExcel = Boolean(config?.excelColumnBinding && activeRow?.data?.[config.excelColumnBinding]);
 
                 return (
                   <div
@@ -377,11 +371,6 @@ export const LiveComposerAndResolver: React.FC<LiveComposerAndResolverProps> = (
                         <span className="text-slate-400 text-[10.5px]">
                           {config?.label || tokenKey}
                         </span>
-                        {isBoundToExcel && (
-                          <span className="px-1.5 py-0.2 rounded bg-emerald-950 text-emerald-300 border border-emerald-800 text-[9.5px]">
-                            из Excel ({config!.excelColumnBinding})
-                          </span>
-                        )}
                       </div>
 
                       <div className="text-[10.5px] text-slate-300 font-medium truncate max-w-[200px]">

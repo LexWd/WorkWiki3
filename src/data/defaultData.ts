@@ -1,5 +1,15 @@
 import { Snippet, PlaceholderConfig, ExcelTable, GuiSettings, ProductivityMetrics, ResourceWidget, NoteCard } from '../types';
 
+export const DEFAULT_CATEGORY_LIST: string[] = [
+  'Приветствие и начало',
+  'Заказы и доставка',
+  'Возвраты и компенсации',
+  'Техническая поддержка',
+  'Оплата и счета',
+  'Эскалации',
+  'Завершение диалога',
+];
+
 export const DEFAULT_PLACEHOLDERS: PlaceholderConfig[] = [
   {
     id: 'ph-1',

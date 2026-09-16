@@ -189,7 +189,7 @@ export const SnippetEditorModal: React.FC<SnippetEditorModalProps> = ({
   const { result: previewResolved } = interpolateSnippet(
     content,
     placeholders,
-    activeRow,
+    null,
     settings.agentName
   );
 

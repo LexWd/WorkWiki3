@@ -7,18 +7,17 @@ import {
   Maximize2, 
   Minimize2, 
   Search,
-  CheckCircle2,
   FileSpreadsheet,
   Globe,
   StickyNote
 } from 'lucide-react';
-import { GuiSettings, ExcelRow, ActiveTab } from '../types';
+import { GuiSettings, ActiveTab } from '../types';
 import { getThemeClasses, getAccentClasses, getDensityPadding } from '../utils/theme';
+import { soundService } from '../utils/sound';
 
 interface DesktopHeaderProps {
   settings: GuiSettings;
   onUpdateSettings: (partial: Partial<GuiSettings>) => void;
-  activeRow: ExcelRow | null;
   activeTab: ActiveTab;
   onSelectTab: (tab: ActiveTab) => void;
   onOpenSettings: () => void;
@@ -31,11 +30,11 @@ interface DesktopHeaderProps {
   placeholderCount: number;
   resourceCount: number;
   noteCount: number;
+  onLogoClick?: () => void;
 }
 
 export const DesktopHeader: React.FC<DesktopHeaderProps> = ({
   settings,
-  activeRow,
   activeTab,
   onSelectTab,
   onOpenSettings,
@@ -48,129 +47,132 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({
   placeholderCount,
   resourceCount,
   noteCount,
+  onLogoClick,
 }) => {
   const theme = getThemeClasses(settings.theme);
   const accent = getAccentClasses(settings.accentColor);
   const density = getDensityPadding(settings.density);
 
+  const handleLogoAction = () => {
+    soundService.playClick(settings.soundEffects);
+    if (onLogoClick) {
+      onLogoClick();
+    } else {
+      onSelectTab('snippets');
+    }
+  };
+
   return (
-    <header className={`${density.headerHeight} px-3 border-b ${theme.border} ${theme.panelHeader} flex items-center justify-between gap-2 shrink-0 select-none w-full min-w-0`}>
-      {/* Brand & Tabs */}
+    <header className={`min-h-[46px] h-auto py-1 px-3 border-b ${theme.border} ${theme.panelHeader} flex items-center justify-between gap-2 shrink-0 select-none w-full min-w-0 z-20`}>
+      {/* Brand & Navigation Tabs Container */}
       <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1 overflow-hidden">
         {/* App Logo & Home trigger */}
         <button
           type="button"
-          onClick={() => onSelectTab('snippets')}
-          className="flex items-center gap-2 shrink-0 text-left rounded-lg p-0.5 group cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 transition-opacity hover:opacity-90"
-          title="QuickReply Desk — Главная / Шаблоны ответов (Ctrl+1)"
+          onClick={handleLogoAction}
+          className="flex items-center gap-2 shrink-0 text-left rounded-lg p-1 group cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 transition-all hover:bg-slate-800/60 active:scale-95"
+          title="На главную: Шаблоны ответов (Ctrl+1). Кликните для быстрого возврата"
         >
           <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs shadow-sm transition-transform group-hover:scale-105 ${accent.primary}`}>
             <Zap className="w-4 h-4 fill-current" />
           </div>
           <div className="hidden md:block shrink-0">
             <h1 className="font-bold text-xs text-slate-100 leading-tight group-hover:text-white transition-colors">QuickReply Desk</h1>
-            <span className="text-[9.5px] font-mono text-slate-400 block">v2.0</span>
+            <span className="text-[9px] font-mono text-slate-400 block">v2.0 • Рабочее место оператора</span>
           </div>
         </button>
 
-        {/* Navigation Tabs */}
+        {/* Navigation Tabs (scrollable if viewport/font is large) */}
         <nav className="flex items-center gap-0.5 sm:gap-1 bg-slate-900/90 p-0.5 rounded-lg border border-slate-800 overflow-x-auto no-scrollbar min-w-0 flex-1 sm:flex-initial">
           <button
+            type="button"
             onClick={() => onSelectTab('snippets')}
-            className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-md text-xs font-semibold whitespace-nowrap transition-all shrink-0 ${
+            className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-md text-xs font-semibold whitespace-nowrap transition-all shrink-0 cursor-pointer ${
               activeTab === 'snippets'
-                ? `${accent.primary} shadow-xs`
+                ? `${accent.primary} shadow-xs font-bold`
                 : 'text-slate-400 hover:text-slate-200'
             }`}
             title="Шаблоны быстрых ответов (Ctrl+1)"
           >
             <Zap className="w-3.5 h-3.5" />
             <span>Шаблоны</span>
-            <span className="font-mono text-[10px] opacity-70">({snippetCount})</span>
+            <span className="hidden sm:inline font-mono text-[9.5px] opacity-75">({snippetCount})</span>
           </button>
 
           <button
+            type="button"
             onClick={() => onSelectTab('excel')}
-            className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-md text-xs font-semibold whitespace-nowrap transition-all shrink-0 ${
+            className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-md text-xs font-semibold whitespace-nowrap transition-all shrink-0 cursor-pointer ${
               activeTab === 'excel'
-                ? `${accent.primary} shadow-xs`
+                ? `${accent.primary} shadow-xs font-bold`
                 : 'text-slate-400 hover:text-slate-200'
             }`}
-            title="Таблицы Excel и база данных (Ctrl+2)"
+            title="Таблицы и аналитика графиков (Ctrl+2)"
           >
             <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
             <span>Excel</span>
-            <span className="font-mono text-[10px] opacity-70">({tableCount})</span>
+            <span className="hidden sm:inline font-mono text-[9.5px] opacity-75">({tableCount})</span>
           </button>
 
           <button
+            type="button"
             onClick={() => onSelectTab('placeholders')}
-            className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-md text-xs font-semibold whitespace-nowrap transition-all shrink-0 ${
+            className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-md text-xs font-semibold whitespace-nowrap transition-all shrink-0 cursor-pointer ${
               activeTab === 'placeholders'
-                ? `${accent.primary} shadow-xs`
+                ? `${accent.primary} shadow-xs font-bold`
                 : 'text-slate-400 hover:text-slate-200'
             }`}
             title="База плейсхолдеров (Ctrl+3)"
           >
             <Brackets className="w-3.5 h-3.5 text-sky-400" />
             <span>Плейсхолдеры</span>
-            <span className="font-mono text-[10px] opacity-70">({placeholderCount})</span>
+            <span className="hidden sm:inline font-mono text-[9.5px] opacity-75">({placeholderCount})</span>
           </button>
 
           <button
+            type="button"
             onClick={() => onSelectTab('resources')}
-            className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-md text-xs font-semibold whitespace-nowrap transition-all shrink-0 ${
+            className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-md text-xs font-semibold whitespace-nowrap transition-all shrink-0 cursor-pointer ${
               activeTab === 'resources'
-                ? `${accent.primary} shadow-xs`
+                ? `${accent.primary} shadow-xs font-bold`
                 : 'text-slate-400 hover:text-slate-200'
             }`}
-            title="База полезных ссылок и виджетов (Ctrl+4)"
+            title="База ссылок и виджетов (Ctrl+4)"
           >
             <Globe className="w-3.5 h-3.5 text-blue-400" />
             <span>Ссылки</span>
-            <span className="font-mono text-[10px] opacity-70">({resourceCount})</span>
+            <span className="hidden sm:inline font-mono text-[9.5px] opacity-75">({resourceCount})</span>
           </button>
 
           <button
+            type="button"
             onClick={() => onSelectTab('notes')}
-            className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-md text-xs font-semibold whitespace-nowrap transition-all shrink-0 ${
+            className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-md text-xs font-semibold whitespace-nowrap transition-all shrink-0 cursor-pointer ${
               activeTab === 'notes'
-                ? `${accent.primary} shadow-xs`
+                ? `${accent.primary} shadow-xs font-bold`
                 : 'text-slate-400 hover:text-slate-200'
             }`}
             title="Заметки смены и чек-листы (Ctrl+5)"
           >
             <StickyNote className="w-3.5 h-3.5 text-amber-400" />
             <span>Заметки</span>
-            <span className="font-mono text-[10px] opacity-70">({noteCount})</span>
+            <span className="hidden sm:inline font-mono text-[9.5px] opacity-75">({noteCount})</span>
           </button>
         </nav>
       </div>
 
-      {/* Middle: Active Excel Row Indicator (visible on very wide screens) */}
-      <div className="hidden 2xl:flex items-center gap-2 min-w-0 shrink">
-        {activeRow ? (
-          <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 text-xs">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-            <span className="font-medium truncate max-w-[200px]">
-              {Object.values(activeRow.data)[0] || 'Строка'}
-            </span>
-          </div>
-        ) : null}
-      </div>
-
-      {/* Right: Quick Tools & Settings (Always pinned to right and non-shrinking) */}
-      <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 ml-auto z-10">
+      {/* Right Tools & Actions (Pinned to right, NEVER cut off or pushed out) */}
+      <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 ml-auto z-30">
         {/* Quick Search / Command Palette trigger */}
         <button
           type="button"
           onClick={onOpenPalette}
-          className="flex items-center gap-1.5 px-2 py-1 rounded-lg border border-slate-700/80 bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-xs transition-colors shrink-0"
+          className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg border border-slate-700/80 bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-xs transition-colors shrink-0 cursor-pointer"
           title="Быстрый поиск шаблонов (Ctrl+K или /)"
         >
           <Search className="w-3.5 h-3.5 text-sky-400" />
-          <span className="hidden lg:inline">Поиск</span>
-          <kbd className="hidden md:inline-block font-mono text-[10px] bg-black/30 px-1 py-0.2 rounded border border-slate-700 text-slate-400">
+          <span className="hidden xl:inline">Поиск</span>
+          <kbd className="hidden lg:inline-block font-mono text-[9.5px] bg-black/40 px-1 py-0.2 rounded border border-slate-700 text-slate-400">
             Ctrl+K
           </kbd>
         </button>
@@ -179,7 +181,7 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({
         <button
           type="button"
           onClick={onOpenShortcuts}
-          className="p-1.5 rounded-lg border border-slate-700/80 hover:bg-slate-800 text-slate-300 transition-colors shrink-0"
+          className="p-1.5 rounded-lg border border-slate-700/80 hover:bg-slate-800 text-slate-300 transition-colors shrink-0 cursor-pointer"
           title="Горячие клавиши (нажмите ?)"
         >
           <Keyboard className="w-3.5 h-3.5" />
@@ -189,7 +191,7 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({
         <button
           type="button"
           onClick={onToggleMiniMode}
-          className={`p-1.5 rounded-lg border transition-colors shrink-0 ${
+          className={`p-1.5 rounded-lg border transition-colors shrink-0 cursor-pointer ${
             isMiniMode
               ? `${accent.primary}`
               : 'border-slate-700/80 hover:bg-slate-800 text-slate-300'
@@ -199,17 +201,18 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({
           {isMiniMode ? <Maximize2 className="w-3.5 h-3.5" /> : <Minimize2 className="w-3.5 h-3.5" />}
         </button>
 
-        {/* GUI Customization Settings */}
+        {/* GUI Customization Settings (Always accessible) */}
         <button
           type="button"
+          id="btn-app-settings"
           onClick={onOpenSettings}
-          className="p-1.5 rounded-lg border border-slate-700/80 hover:bg-slate-800 text-slate-300 transition-colors shrink-0"
-          title="Настройки интерфейса и темы"
+          className="p-1.5 rounded-lg border border-slate-700/80 hover:bg-slate-800 text-slate-200 transition-colors shrink-0 cursor-pointer bg-slate-800/90 shadow-xs ring-1 ring-slate-700/50"
+          title="Настройки интерфейса, масштаба шрифта и темы"
         >
-          <Settings className="w-3.5 h-3.5" />
+          <Settings className="w-3.5 h-3.5 text-sky-400" />
         </button>
 
-        {/* Operator Profile */}
+        {/* Operator Profile Badge (Only on ultra wide screens) */}
         <div className="hidden 2xl:flex items-center gap-1.5 pl-2 border-l border-slate-800 text-xs text-slate-300 shrink-0">
           <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
           <span className="truncate max-w-[110px] font-medium">{settings.agentName}</span>

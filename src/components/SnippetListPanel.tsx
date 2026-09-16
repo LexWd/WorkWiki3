@@ -11,6 +11,7 @@ import {
   Trash2,
   FileJson,
   FolderPlus,
+  FolderCog,
   X
 } from 'lucide-react';
 import { Snippet, PlaceholderConfig, ExcelRow, GuiSettings } from '../types';
@@ -20,7 +21,7 @@ import { interpolateSnippet } from '../utils/interpolator';
 interface SnippetListPanelProps {
   snippets: Snippet[];
   placeholders: PlaceholderConfig[];
-  activeRow: ExcelRow | null;
+  activeRow?: ExcelRow | null;
   settings: GuiSettings;
   onCopySnippet: (snippet: Snippet) => void;
   onEditSnippet: (snippet: Snippet) => void;
@@ -30,26 +31,15 @@ interface SnippetListPanelProps {
   onOpenSettings?: (section?: 'gui' | 'collections' | 'backup') => void;
   selectedSnippetId: string | null;
   onSelectSnippet: (snippet: Snippet) => void;
-  customCategories?: string[];
-  onAddCategory?: (category: string) => void;
-  onDeleteCategory?: (category: string) => void;
+  categories: string[];
+  onAddCategory: (category: string) => void;
+  onDeleteCategory: (category: string, reassignTo?: string) => void;
+  onOpenCategoryManager?: () => void;
 }
-
-const DEFAULT_CATEGORIES = [
-  'Все',
-  'Приветствие и начало',
-  'Заказы и доставка',
-  'Возвраты и компенсации',
-  'Техническая поддержка',
-  'Оплата и счета',
-  'Эскалации',
-  'Завершение диалога',
-];
 
 export const SnippetListPanel: React.FC<SnippetListPanelProps> = ({
   snippets,
   placeholders,
-  activeRow,
   settings,
   onCopySnippet,
   onEditSnippet,
@@ -59,9 +49,10 @@ export const SnippetListPanel: React.FC<SnippetListPanelProps> = ({
   onOpenSettings,
   selectedSnippetId,
   onSelectSnippet,
-  customCategories = [],
+  categories,
   onAddCategory,
   onDeleteCategory,
+  onOpenCategoryManager,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Все');
@@ -72,14 +63,10 @@ export const SnippetListPanel: React.FC<SnippetListPanelProps> = ({
   const [newCategoryName, setNewCategoryName] = useState('');
   const addCategoryInputRef = useRef<HTMLInputElement>(null);
 
-  // Derive dynamic list of categories from existing snippets + defaults + custom categories
+  // Derive dynamic list of categories from categories prop
   const availableCategories = useMemo(() => {
-    const fromSnippets = snippets
-      .map((s) => s.category)
-      .filter((c) => Boolean(c) && !DEFAULT_CATEGORIES.includes(c));
-    const allCustom = Array.from(new Set([...customCategories, ...fromSnippets]));
-    return [...DEFAULT_CATEGORIES, ...allCustom];
-  }, [snippets, customCategories]);
+    return ['Все', ...categories];
+  }, [categories]);
 
   const theme = getThemeClasses(settings.theme);
   const accent = getAccentClasses(settings.accentColor);
@@ -125,20 +112,11 @@ export const SnippetListPanel: React.FC<SnippetListPanelProps> = ({
       return;
     }
 
-    if (onAddCategory) {
-      onAddCategory(trimmed);
-    }
+    onAddCategory(trimmed);
     setSelectedCategory(trimmed);
     setNewCategoryName('');
     setIsAddingCategory(false);
   };
-
-  const isCurrentCategoryCustom = useMemo(() => {
-    return (
-      selectedCategory !== 'Все' &&
-      !DEFAULT_CATEGORIES.includes(selectedCategory)
-    );
-  }, [selectedCategory]);
 
   const currentCategorySnippetCount = useMemo(() => {
     if (selectedCategory === 'Все') return snippets.length;
@@ -147,35 +125,35 @@ export const SnippetListPanel: React.FC<SnippetListPanelProps> = ({
 
   return (
     <div className={`flex flex-col h-full border-r ${theme.border} ${theme.panel} overflow-hidden text-xs select-none`}>
-      {/* Search and Quick Add Bar */}
-      <div className={`${density.card} border-b ${theme.border} ${theme.panelHeader} ${density.spaceY} shrink-0`}>
+      {/* Top Search & Filter Bar */}
+      <div className={`p-2 border-b ${theme.border} ${theme.panelHeader} space-y-2 shrink-0`}>
+        {/* Search Input & Action Buttons */}
         <div className="flex items-center gap-1.5">
-          <div className="relative flex-1 min-w-0">
+          <div className="relative flex-1">
             <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 opacity-50 pointer-events-none" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Поиск по названию, /команде, тегу..."
-              className={`w-full pl-8 pr-7 py-1.5 rounded-lg border outline-none text-xs transition-colors select-text ${theme.input}`}
+              placeholder="Поиск по названию, тексту, тегам или /командам..."
+              className={`w-full pl-8 pr-3 py-1.5 rounded-lg border text-xs outline-none transition-colors select-text ${theme.input}`}
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 opacity-50 hover:opacity-100 text-xs cursor-pointer"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 text-xs"
               >
                 ×
               </button>
             )}
           </div>
 
-          {/* New Snippet Button */}
           <button
             type="button"
             onClick={() => onCreateNew(selectedCategory !== 'Все' ? selectedCategory : undefined)}
-            className={`flex items-center gap-1 px-3 py-1.5 rounded-lg font-bold text-xs shadow-sm shrink-0 cursor-pointer transition-opacity hover:opacity-90 ${accent.primary}`}
-            title="Создать новый быстрый ответ (Ctrl+N)"
+            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-opacity hover:opacity-90 shrink-0 cursor-pointer ${accent.primary}`}
+            title="Создать новый шаблон (Ctrl+N)"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Новый</span>
@@ -204,7 +182,9 @@ export const SnippetListPanel: React.FC<SnippetListPanelProps> = ({
             {isAddingCategory ? (
               <form
                 onSubmit={handleConfirmAddCategory}
-                className="flex items-center gap-1 shrink-0 bg-slate-900 border border-sky-500/80 rounded-md p-0.5 shadow-sm"
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                className="flex items-center gap-1 shrink-0 bg-slate-900 border border-sky-500 rounded-md p-0.5 shadow-sm"
               >
                 <input
                   ref={addCategoryInputRef}
@@ -212,9 +192,11 @@ export const SnippetListPanel: React.FC<SnippetListPanelProps> = ({
                   value={newCategoryName}
                   onChange={(e) => setNewCategoryName(e.target.value)}
                   placeholder="Новая категория..."
-                  className="px-1.5 py-0.5 rounded text-[10.5px] bg-slate-950 text-slate-100 outline-none w-32 select-text"
+                  className="px-2 py-0.5 rounded text-[11px] bg-slate-950 text-slate-100 outline-none w-36 select-text"
                   autoFocus
+                  onClick={(e) => e.stopPropagation()}
                   onKeyDown={(e) => {
+                    e.stopPropagation();
                     if (e.key === 'Escape') {
                       setIsAddingCategory(false);
                       setNewCategoryName('');
@@ -241,18 +223,34 @@ export const SnippetListPanel: React.FC<SnippetListPanelProps> = ({
                 </button>
               </form>
             ) : (
-              <button
-                type="button"
-                onClick={() => {
-                  setIsAddingCategory(true);
-                  setTimeout(() => addCategoryInputRef.current?.focus(), 50);
-                }}
-                className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-medium text-sky-400 hover:text-sky-300 bg-sky-950/40 hover:bg-sky-900/50 border border-dashed border-sky-500/50 shrink-0 whitespace-nowrap transition-colors cursor-pointer"
-                title="Добавить новую категорию вручную"
-              >
-                <FolderPlus className="w-3 h-3" />
-                <span>+ Категория</span>
-              </button>
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAddingCategory(true);
+                    setTimeout(() => {
+                      addCategoryInputRef.current?.focus();
+                      addCategoryInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+                    }, 50);
+                  }}
+                  className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-medium text-sky-400 hover:text-sky-300 bg-sky-950/40 hover:bg-sky-900/50 border border-dashed border-sky-500/50 shrink-0 whitespace-nowrap transition-colors cursor-pointer"
+                  title="Добавить новую категорию вручную"
+                >
+                  <FolderPlus className="w-3 h-3" />
+                  <span>+ Категория</span>
+                </button>
+
+                {onOpenCategoryManager && (
+                  <button
+                    type="button"
+                    onClick={onOpenCategoryManager}
+                    className="p-1 rounded-md text-slate-400 hover:text-sky-300 hover:bg-slate-800/80 border border-slate-700/60 transition-colors cursor-pointer shrink-0"
+                    title="Управление категориями (создание, удаление, сброс к стандартным)"
+                  >
+                    <FolderCog className="w-3.5 h-3.5 text-sky-400" />
+                  </button>
+                )}
+              </div>
             )}
           </div>
 
@@ -269,27 +267,48 @@ export const SnippetListPanel: React.FC<SnippetListPanelProps> = ({
           )}
         </div>
 
-        {/* Action bar for custom category (e.g. Delete empty category) */}
-        {isCurrentCategoryCustom && (
-          <div className="flex items-center justify-between bg-slate-900/60 px-2 py-1 rounded border border-slate-800 text-[10.5px]">
+        {/* Action bar for Selected Category: Deletion of ANY category (standard or custom) */}
+        {selectedCategory !== 'Все' && (
+          <div className="flex items-center justify-between bg-slate-900/70 px-2.5 py-1 rounded border border-slate-800 text-[10.5px]">
             <div className="flex items-center gap-1.5 text-slate-300">
               <span className="font-semibold text-sky-300">{selectedCategory}</span>
               <span className="text-slate-500 font-mono">({currentCategorySnippetCount} шаблонов)</span>
             </div>
-            {currentCategorySnippetCount === 0 && onDeleteCategory && (
-              <button
-                type="button"
-                onClick={() => {
-                  onDeleteCategory(selectedCategory);
-                  setSelectedCategory('Все');
-                }}
-                className="flex items-center gap-1 text-rose-400 hover:text-rose-300 hover:underline cursor-pointer"
-                title="Удалить пустую категорию"
-              >
-                <Trash2 className="w-3 h-3" />
-                <span>Удалить категорию</span>
-              </button>
-            )}
+            <div className="flex items-center gap-2.5">
+              {onOpenCategoryManager && (
+                <button
+                  type="button"
+                  onClick={onOpenCategoryManager}
+                  className="text-slate-400 hover:text-sky-300 flex items-center gap-1 cursor-pointer transition-colors"
+                  title="Открыть окно управления всеми категориями"
+                >
+                  <FolderCog className="w-3 h-3" />
+                  <span>Управление</span>
+                </button>
+              )}
+
+              {onDeleteCategory && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (currentCategorySnippetCount === 0) {
+                      onDeleteCategory(selectedCategory);
+                      setSelectedCategory('Все');
+                    } else {
+                      if (confirm(`В категории «${selectedCategory}» находится ${currentCategorySnippetCount} шаблонов. Они будут перемещены в «Общее». Удалить категорию?`)) {
+                        onDeleteCategory(selectedCategory, 'Общее');
+                        setSelectedCategory('Все');
+                      }
+                    }
+                  }}
+                  className="flex items-center gap-1 text-rose-400 hover:text-rose-300 hover:underline cursor-pointer"
+                  title={`Удалить категорию «${selectedCategory}»`}
+                >
+                  <Trash2 className="w-3 h-3" />
+                  <span>Удалить категорию</span>
+                </button>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -322,10 +341,11 @@ export const SnippetListPanel: React.FC<SnippetListPanelProps> = ({
           filteredSnippets.map((snippet) => {
             const isSelected = selectedSnippetId === snippet.id;
             const isCopied = copiedId === snippet.id;
+            // Templates decoupled from Excel activeRow
             const { result: previewText } = interpolateSnippet(
               snippet.content,
               placeholders,
-              activeRow,
+              null,
               settings.agentName
             );
 
@@ -333,113 +353,124 @@ export const SnippetListPanel: React.FC<SnippetListPanelProps> = ({
               <div
                 key={snippet.id}
                 onClick={() => onSelectSnippet(snippet)}
-                className={`${density.card} rounded-lg border transition-all cursor-pointer group select-text ${
+                className={`group relative rounded-lg border transition-all cursor-pointer ${
+                  density.card
+                } ${
                   isSelected
-                    ? `${accent.primaryMuted} border-sky-400/80 ring-1 ring-sky-400/30`
+                    ? `${theme.cardActive} shadow-md`
                     : `${theme.card} hover:border-slate-600`
                 }`}
               >
-                {/* Header: Title, Shortcut, Hotkey, Pin */}
-                <div className="flex items-start justify-between gap-1.5">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="font-bold text-slate-100 text-xs truncate">
-                        {snippet.title}
-                      </span>
-                      <span className="font-mono text-[10px] text-sky-400 bg-sky-950/70 border border-sky-800/80 px-1.5 py-0.2 rounded font-semibold">
-                        {snippet.shortcut}
-                      </span>
-                      {snippet.hotkey && (
-                        <span className="font-mono text-[9.5px] bg-slate-800 text-slate-300 border border-slate-700 px-1 py-0.2 rounded font-bold shadow-xs">
-                          {snippet.hotkey}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-1 shrink-0">
+                {/* Header row */}
+                <div className="flex items-start justify-between gap-1.5 mb-1">
+                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                    {/* Pin button */}
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         onTogglePin(snippet.id);
                       }}
-                      className={`p-1 rounded transition-colors cursor-pointer ${
+                      className={`p-0.5 rounded transition-colors shrink-0 ${
                         snippet.isPinned
-                          ? 'text-amber-400 bg-amber-950/50'
-                          : 'text-slate-500 hover:text-slate-300'
+                          ? 'text-amber-400 hover:text-amber-300'
+                          : 'text-slate-500 opacity-0 group-hover:opacity-100 hover:text-slate-300'
                       }`}
-                      title={snippet.isPinned ? 'Открепить' : 'Закрепить вверху'}
+                      title={snippet.isPinned ? 'Открепить' : 'Закрепить наверху'}
                     >
-                      <Pin className="w-3 h-3 fill-current" />
+                      <Pin className="w-3.5 h-3.5 fill-current" />
                     </button>
 
+                    <h3 className="font-semibold text-slate-100 truncate text-[12.5px]">
+                      {snippet.title}
+                    </h3>
+                  </div>
+
+                  {/* Hotkey or Shortcut pill */}
+                  <div className="flex items-center gap-1 shrink-0">
+                    {snippet.hotkey && (
+                      <span className="font-mono text-[10px] px-1.5 py-0.2 rounded bg-black/40 text-sky-400 border border-slate-700">
+                        {snippet.hotkey}
+                      </span>
+                    )}
+                    <span className="font-mono text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                      {snippet.shortcut}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Interpolated Preview Text */}
+                <p className="text-[11.5px] text-slate-300/90 line-clamp-2 mb-2 leading-relaxed font-sans select-text">
+                  {previewText}
+                </p>
+
+                {/* Footer Meta & Quick Action Buttons */}
+                <div className="flex items-center justify-between text-[10.5px] text-slate-400 pt-1 border-t border-slate-800/60">
+                  <div className="flex items-center gap-1.5 overflow-hidden">
+                    <span className="text-slate-500 font-medium truncate max-w-[130px]">
+                      {snippet.category}
+                    </span>
+                    {snippet.tags.length > 0 && (
+                      <>
+                        <span className="text-slate-600">•</span>
+                        <span className="truncate text-slate-500 max-w-[150px]">
+                          #{snippet.tags.join(' #')}
+                        </span>
+                      </>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-1 shrink-0">
+                    {/* Edit button */}
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         onEditSnippet(snippet);
                       }}
-                      className="p-1 rounded text-slate-400 hover:text-sky-300 transition-colors cursor-pointer"
+                      className="p-1 rounded opacity-40 group-hover:opacity-100 hover:text-sky-400 hover:bg-slate-800 transition-opacity"
                       title="Редактировать шаблон"
                     >
-                      <Edit3 className="w-3 h-3" />
+                      <Edit3 className="w-3.5 h-3.5" />
                     </button>
 
+                    {/* Delete button */}
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (confirm(`Удалить шаблон «${snippet.title}»?`)) {
-                          onDeleteSnippet(snippet.id);
-                        }
+                        onDeleteSnippet(snippet.id);
                       }}
-                      className="p-1 rounded text-slate-400 hover:text-rose-400 transition-colors cursor-pointer"
+                      className="p-1 rounded opacity-40 group-hover:opacity-100 hover:text-rose-400 hover:bg-slate-800 transition-opacity"
                       title="Удалить шаблон"
                     >
-                      <Trash2 className="w-3 h-3" />
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
 
-                    {/* Copy Button */}
+                    {/* Instant Copy Button */}
                     <button
                       type="button"
                       onClick={(e) => handleCopyClick(e, snippet)}
-                      className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold transition-all cursor-pointer ${
+                      className={`flex items-center gap-1 px-2 py-0.5 rounded-md font-semibold transition-all ${
                         isCopied
-                          ? 'bg-emerald-600 text-white'
+                          ? 'bg-emerald-600 text-white shadow-xs'
                           : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
                       }`}
                       title="Скопировать подставленный текст в буфер обмена"
                     >
-                      {isCopied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                      <span>{isCopied ? 'Копия!' : 'Копировать'}</span>
+                      {isCopied ? (
+                        <>
+                          <Check className="w-3 h-3 text-white" />
+                          <span>Скопировано</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3 h-3 text-sky-400" />
+                          <span>Копировать</span>
+                        </>
+                      )}
                     </button>
                   </div>
-                </div>
-
-                {/* Content Preview */}
-                <p className="text-[11px] text-slate-300 line-clamp-2 mt-1.5 leading-relaxed font-sans select-text">
-                  {previewText}
-                </p>
-
-                {/* Footer: Category, Tags & Usage Stats */}
-                <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-slate-800/60 text-[10px] text-slate-400">
-                  <div className="flex items-center gap-1.5 overflow-hidden truncate">
-                    <span className="text-sky-400/90 font-medium truncate max-w-[120px]">
-                      {snippet.category}
-                    </span>
-                    {snippet.tags.length > 0 && <span className="text-slate-600">•</span>}
-                    {snippet.tags.slice(0, 2).map((t) => (
-                      <span key={t} className="text-slate-400 font-mono">
-                        #{t}
-                      </span>
-                    ))}
-                  </div>
-
-                  <span className="shrink-0 text-slate-500">
-                    {snippet.usageCount} исп.
-                  </span>
                 </div>
               </div>
             );
@@ -447,28 +478,12 @@ export const SnippetListPanel: React.FC<SnippetListPanelProps> = ({
         )}
       </div>
 
-      {/* Footer bar with link to settings collections */}
-      <div className={`p-2 border-t ${theme.border} ${theme.panelHeader} flex flex-wrap items-center justify-between gap-1 text-[11px] text-slate-400 shrink-0`}>
-        <div className="flex items-center gap-1.5">
-          <span>Всего шаблонов: <strong className="text-slate-200">{filteredSnippets.length}</strong></span>
-          {selectedCategory !== 'Все' && (
-            <span className="text-[10px] text-slate-400 font-mono hidden xl:inline">
-              (в «{selectedCategory}»)
-            </span>
-          )}
-        </div>
-
-        {onOpenSettings && (
-          <button
-            type="button"
-            onClick={() => onOpenSettings('collections')}
-            className="text-[10.5px] text-sky-400 hover:text-sky-300 flex items-center gap-1 transition-colors hover:underline cursor-pointer"
-            title="Импортировать или экспортировать коллекции JSON в настройках"
-          >
-            <FileJson className="w-3 h-3 text-sky-400" />
-            <span>Импорт/Экспорт JSON</span>
-          </button>
-        )}
+      {/* Footer Info Count */}
+      <div className={`p-2 border-t ${theme.border} ${theme.panelHeader} flex items-center justify-between text-[11px] text-slate-400 shrink-0`}>
+        <span>
+          Показано: <strong className="text-slate-200">{filteredSnippets.length}</strong> из {snippets.length}
+        </span>
+        <span className="text-slate-500 font-mono">Alt+1..9 быстрый выбор</span>
       </div>
     </div>
   );

@@ -7,7 +7,7 @@ import { interpolateSnippet } from '../utils/interpolator';
 interface MiniHudBarProps {
   snippets: Snippet[];
   placeholders: PlaceholderConfig[];
-  activeRow: ExcelRow | null;
+  activeRow?: ExcelRow | null;
   onCopySnippet: (snippet: Snippet) => void;
   onToggleMiniMode: () => void;
   settings: GuiSettings;
@@ -15,8 +15,6 @@ interface MiniHudBarProps {
 
 export const MiniHudBar: React.FC<MiniHudBarProps> = ({
   snippets,
-  placeholders,
-  activeRow,
   onCopySnippet,
   onToggleMiniMode,
   settings,
@@ -55,12 +53,6 @@ export const MiniHudBar: React.FC<MiniHudBarProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
-          {activeRow && (
-            <span className="text-[10px] text-emerald-400 bg-emerald-950 px-2 py-0.5 rounded border border-emerald-800 font-mono">
-              Excel: {Object.values(activeRow.data)[0]}
-            </span>
-          )}
-
           <button
             onClick={onToggleMiniMode}
             className="flex items-center gap-1 px-2 py-0.5 rounded border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px]"

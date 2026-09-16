@@ -29,6 +29,7 @@ import { GuiCustomizationModal } from './components/GuiCustomizationModal';
 import { ShortcutsCheatSheetModal } from './components/ShortcutsCheatSheetModal';
 import { ProductivityStatsBar } from './components/ProductivityStatsBar';
 import { ToastNotice, ToastItem } from './components/ToastNotice';
+import { CategoryManagerModal } from './components/CategoryManagerModal';
 
 export default function App() {
   // Core persistent states
@@ -70,7 +71,8 @@ export default function App() {
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   const [editingSnippet, setEditingSnippet] = useState<Snippet | null | 'NEW'>(null);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
-  const [customCategories, setCustomCategories] = useState<string[]>(() => storage.loadCustomCategories());
+  const [categories, setCategories] = useState<string[]>(() => storage.loadCategories());
+  const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
   const [newSnippetInitialCategory, setNewSnippetInitialCategory] = useState<string | undefined>(undefined);
 
   // Theme & font helpers
@@ -107,8 +109,8 @@ export default function App() {
   }, [metrics]);
 
   useEffect(() => {
-    storage.saveCustomCategories(customCategories);
-  }, [customCategories]);
+    storage.saveCategories(categories);
+  }, [categories]);
 
   // Apply density and font-size to document root so all components scale dynamically
   useEffect(() => {
@@ -261,53 +263,58 @@ export default function App() {
     showToast('Ресурс удален', 'Закладка удалена из списка');
   }, [showToast]);
 
-  // Custom categories management
+  // Categories management
   const handleAddCategory = useCallback((newCat: string) => {
     const trimmed = newCat.trim();
     if (!trimmed) return;
-    setCustomCategories((prev) => {
-      if (prev.includes(trimmed)) return prev;
+    setCategories((prev) => {
+      if (prev.some((c) => c.toLowerCase() === trimmed.toLowerCase())) return prev;
       const updated = [...prev, trimmed];
-      storage.saveCustomCategories(updated);
+      storage.saveCategories(updated);
       return updated;
     });
     showToast('Категория добавлена', `Категория «${trimmed}» готова для шаблонов`);
   }, [showToast]);
 
-  const handleDeleteCategory = useCallback((catToDelete: string) => {
-    setCustomCategories((prev) => {
+  const handleDeleteCategory = useCallback((catToDelete: string, reassignTo: string = 'Общее') => {
+    setCategories((prev) => {
       const updated = prev.filter((c) => c !== catToDelete);
-      storage.saveCustomCategories(updated);
+      storage.saveCategories(updated);
       return updated;
     });
-    showToast('Категория удалена', `Категория «${catToDelete}» удалена`);
+    // Reassign snippets that belonged to deleted category
+    setSnippets((prev) =>
+      prev.map((s) => (s.category === catToDelete ? { ...s, category: reassignTo } : s))
+    );
+    showToast('Категория удалена', `Категория «${catToDelete}» удалена. Шаблоны перемещены в «${reassignTo}».`);
   }, [showToast]);
 
-  const allCategories = useMemo(() => {
-    const defaultList = [
-      'Приветствие и начало',
-      'Заказы и доставка',
-      'Возвраты и компенсации',
-      'Техническая поддержка',
-      'Оплата и счета',
-      'Эскалации',
-      'Завершение диалога',
-    ];
-    const fromSnippets = snippets.map((s) => s.category).filter(Boolean);
-    return Array.from(new Set([...defaultList, ...customCategories, ...fromSnippets]));
-  }, [snippets, customCategories]);
+  const handleRenameCategory = useCallback((oldName: string, newName: string) => {
+    const trimmed = newName.trim();
+    if (!trimmed || oldName === trimmed) return;
+    setCategories((prev) => {
+      const updated = prev.map((c) => (c === oldName ? trimmed : c));
+      storage.saveCategories(updated);
+      return updated;
+    });
+    setSnippets((prev) =>
+      prev.map((s) => (s.category === oldName ? { ...s, category: trimmed } : s))
+    );
+    showToast('Категория переименована', `«${oldName}» → «${trimmed}»`);
+  }, [showToast]);
+
+  const handleResetCategories = useCallback(() => {
+    const defaults = storage.resetCategories();
+    setCategories(defaults);
+    showToast('Категории сброшены', 'Восстановлен стандартный набор категорий');
+  }, [showToast]);
 
   // Snippet save
   const handleSaveSnippet = useCallback(
     (data: Omit<Snippet, 'id' | 'usageCount' | 'updatedAt'> & { id?: string }) => {
       // If user saved snippet with new category, ensure category is tracked
-      if (data.category && !customCategories.includes(data.category)) {
-        setCustomCategories((prev) => {
-          if (prev.includes(data.category)) return prev;
-          const updated = [...prev, data.category];
-          storage.saveCustomCategories(updated);
-          return updated;
-        });
+      if (data.category && !categories.includes(data.category)) {
+        handleAddCategory(data.category);
       }
 
       if (data.id) {
@@ -347,7 +354,7 @@ export default function App() {
       }
       soundService.playCopyChime(settings.soundEffects);
     },
-    [customCategories, settings.soundEffects, showToast]
+    [categories, handleAddCategory, settings.soundEffects, showToast]
   );
 
   const handleDeleteSnippet = useCallback((id: string) => {
@@ -603,9 +610,12 @@ export default function App() {
       <DesktopHeader
         settings={settings}
         onUpdateSettings={(partial) => setSettings((prev) => ({ ...prev, ...partial }))}
-        activeRow={activeRow}
         activeTab={activeTab}
         onSelectTab={setActiveTab}
+        onLogoClick={() => {
+          setActiveTab('snippets');
+          showToast('Быстрые ответы', 'Вы на главной странице: Шаблоны ответов');
+        }}
         onOpenSettings={() => {
           setSettingsInitialSection('gui');
           setIsSettingsOpen(true);
@@ -676,9 +686,10 @@ export default function App() {
                       handleCopySnippet(s);
                     }
                   }}
-                  customCategories={customCategories}
+                  categories={categories}
                   onAddCategory={handleAddCategory}
                   onDeleteCategory={handleDeleteCategory}
+                  onOpenCategoryManager={() => setIsCategoryManagerOpen(true)}
                 />
               </div>
 
@@ -730,6 +741,7 @@ export default function App() {
                 activeRow={activeRow}
                 onSelectActiveRow={setActiveRow}
                 settings={settings}
+                onToastNotice={(title, msg) => showToast(title, msg)}
               />
             </div>
           )}
@@ -812,7 +824,7 @@ export default function App() {
         placeholders={placeholders}
         activeRow={activeRow}
         settings={settings}
-        availableCategories={allCategories}
+        availableCategories={categories}
         onAddNewCategory={handleAddCategory}
         initialCategory={newSnippetInitialCategory}
       />
@@ -836,6 +848,19 @@ export default function App() {
       <ShortcutsCheatSheetModal
         isOpen={isShortcutsOpen}
         onClose={() => setIsShortcutsOpen(false)}
+        settings={settings}
+      />
+
+      {/* 5. Category Manager Modal */}
+      <CategoryManagerModal
+        isOpen={isCategoryManagerOpen}
+        onClose={() => setIsCategoryManagerOpen(false)}
+        categories={categories}
+        snippets={snippets}
+        onAddCategory={handleAddCategory}
+        onDeleteCategory={handleDeleteCategory}
+        onRenameCategory={handleRenameCategory}
+        onResetCategories={handleResetCategories}
         settings={settings}
       />
     </div>
