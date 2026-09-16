@@ -13,7 +13,7 @@ import {
   Info
 } from 'lucide-react';
 import { Snippet, PlaceholderConfig, ExcelRow, GuiSettings } from '../types';
-import { getThemeClasses, getAccentClasses } from '../utils/theme';
+import { getThemeClasses, getAccentClasses, getDensityPadding } from '../utils/theme';
 import { extractTokens, interpolateSnippet, resolveTokenValue } from '../utils/interpolator';
 import { soundService } from '../utils/sound';
 
@@ -52,6 +52,7 @@ export const LiveComposerAndResolver: React.FC<LiveComposerAndResolverProps> = (
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const theme = getThemeClasses(settings.theme);
   const accent = getAccentClasses(settings.accentColor);
+  const density = getDensityPadding(settings.density);
 
   // Drag listener for composer height
   useEffect(() => {
@@ -158,9 +159,9 @@ export const LiveComposerAndResolver: React.FC<LiveComposerAndResolverProps> = (
   };
 
   return (
-    <div className={`flex flex-col h-full ${theme.panel} overflow-hidden text-xs select-none`}>
+    <div className={`flex flex-col h-full ${theme.panel} overflow-hidden text-xs select-none min-w-0`}>
       {/* Header */}
-      <div className={`p-2.5 border-b ${theme.border} ${theme.panelHeader} flex items-center justify-between shrink-0`}>
+      <div className={`${density.card} border-b ${theme.border} ${theme.panelHeader} flex items-center justify-between shrink-0`}>
         <div className="flex items-center gap-2">
           <div className={`w-6 h-6 rounded flex items-center justify-center font-bold text-xs ${accent.primary}`}>
             <Zap className="w-3.5 h-3.5" />
@@ -217,7 +218,7 @@ export const LiveComposerAndResolver: React.FC<LiveComposerAndResolverProps> = (
       {/* Main interactive area: split into Template Editor & Dynamic Resolver */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Top: Raw Input / Template text with autocomplete */}
-        <div className="p-3 border-b border-slate-800 shrink-0 relative">
+        <div className={`${density.card} border-b border-slate-800 shrink-0 relative`}>
           <div className="flex items-center justify-between mb-1.5 text-[10.5px] text-slate-400">
             <span className="font-semibold uppercase tracking-wider text-slate-300">
               Текст шаблона с плейсхолдерами:
@@ -430,7 +431,7 @@ export const LiveComposerAndResolver: React.FC<LiveComposerAndResolverProps> = (
         )}
 
         {/* Bottom: Real-Time Resolved Final Text Preview */}
-        <div className="flex-1 p-3 flex flex-col justify-between overflow-hidden bg-slate-950/40">
+        <div className={`flex-1 ${density.card} flex flex-col justify-between overflow-hidden bg-slate-950/40`}>
           <div className="flex items-center justify-between mb-1.5">
             <span className="font-bold text-[10.5px] uppercase tracking-wider text-emerald-400 flex items-center gap-1">
               <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Итоговый текст для отправки клиенту:

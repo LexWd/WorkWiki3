@@ -126,25 +126,43 @@ export function getDensityPadding(density: InterfaceDensity) {
   switch (density) {
     case 'compact':
       return {
-        container: 'p-2.5',
-        card: 'p-2.5',
-        button: 'px-2.5 py-1 text-xs',
-        gap: 'gap-2',
+        container: 'p-2',
+        card: 'p-1.5',
+        cardInner: 'py-1.5 px-2',
+        tableRow: 'py-1 px-2.5 text-xs',
+        input: 'p-1.5 text-xs',
+        button: 'px-2 py-1 text-xs',
+        gap: 'gap-1.5',
+        spaceY: 'space-y-1',
+        headerHeight: 'h-9',
+        badge: 'py-0.2 px-1 text-[10px]',
       };
     case 'spacious':
       return {
-        container: 'p-5',
-        card: 'p-4.5',
+        container: 'p-4',
+        card: 'p-3.5',
+        cardInner: 'py-3.5 px-4',
+        tableRow: 'py-3 px-4 text-sm',
+        input: 'p-3 text-sm',
         button: 'px-4 py-2 text-sm',
-        gap: 'gap-4',
+        gap: 'gap-3.5',
+        spaceY: 'space-y-3',
+        headerHeight: 'h-12',
+        badge: 'py-1 px-2 text-xs',
       };
     case 'comfortable':
     default:
       return {
-        container: 'p-3.5',
-        card: 'p-3.5',
+        container: 'p-3',
+        card: 'p-2.5',
+        cardInner: 'py-2.5 px-3',
+        tableRow: 'py-2 px-3 text-xs',
+        input: 'p-2 text-xs',
         button: 'px-3 py-1.5 text-xs',
-        gap: 'gap-3',
+        gap: 'gap-2.5',
+        spaceY: 'space-y-2',
+        headerHeight: 'h-11',
+        badge: 'py-0.5 px-1.5 text-[10.5px]',
       };
   }
 }
@@ -154,9 +172,9 @@ export function getFontScaleStyle(scale: FontSizeScale) {
     case 'sm':
       return 'text-[13px]';
     case 'lg':
-      return 'text-[15.5px]';
+      return 'text-[17px]';
     case 'base':
     default:
-      return 'text-[14px]';
+      return 'text-[14.5px]';
   }
 }

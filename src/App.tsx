@@ -29,7 +29,6 @@ import { GuiCustomizationModal } from './components/GuiCustomizationModal';
 import { ShortcutsCheatSheetModal } from './components/ShortcutsCheatSheetModal';
 import { ProductivityStatsBar } from './components/ProductivityStatsBar';
 import { ToastNotice, ToastItem } from './components/ToastNotice';
-import { DesktopTitleBar } from './components/DesktopTitleBar';
 
 export default function App() {
   // Core persistent states
@@ -105,13 +104,33 @@ export default function App() {
     storage.saveMetrics(metrics);
   }, [metrics]);
 
+  // Apply density and font-size to document root so all components scale dynamically
+  useEffect(() => {
+    const root = document.documentElement;
+    root.setAttribute('data-density', settings.density);
+    root.setAttribute('data-font-size', settings.fontSize);
+  }, [settings.density, settings.fontSize]);
+
+  // Clamp sidebar width on window resize so it never overflows or breaks layout
+  useEffect(() => {
+    const handleWindowResize = () => {
+      setSidebarWidth((prev) => {
+        const maxAllowed = Math.max(260, window.innerWidth - 340);
+        return Math.min(prev, maxAllowed);
+      });
+    };
+    window.addEventListener('resize', handleWindowResize);
+    return () => window.removeEventListener('resize', handleWindowResize);
+  }, []);
+
   // Mouse drag listeners for sidebar resizing
   useEffect(() => {
     if (!isResizingSidebar) return;
 
     const handleMouseMove = (e: MouseEvent) => {
       const delta = e.clientX - sidebarStartXRef.current;
-      const nextWidth = Math.max(280, Math.min(700, sidebarStartWidthRef.current + delta));
+      const maxAllowed = Math.max(260, window.innerWidth - 340);
+      const nextWidth = Math.max(260, Math.min(maxAllowed, sidebarStartWidthRef.current + delta));
       setSidebarWidth(nextWidth);
     };
 
@@ -366,8 +385,28 @@ export default function App() {
     );
   }, []);
 
-  // Global Keyboard Shortcuts
+  // Global Keyboard Shortcuts supporting both Latin and Cyrillic (ЙЦУКЕН) layouts
   useEffect(() => {
+    const isKey = (e: KeyboardEvent, code: string, enKey: string, ruKey: string) => {
+      if (e.code === code) return true;
+      const k = e.key.toLowerCase();
+      return k === enKey.toLowerCase() || k === ruKey.toLowerCase();
+    };
+
+    const getDigit = (e: KeyboardEvent): number | null => {
+      if (e.code && e.code.startsWith('Digit')) {
+        const d = parseInt(e.code.replace('Digit', ''), 10);
+        if (!isNaN(d)) return d;
+      }
+      if (e.code && e.code.startsWith('Numpad')) {
+        const d = parseInt(e.code.replace('Numpad', ''), 10);
+        if (!isNaN(d)) return d;
+      }
+      const parsed = parseInt(e.key, 10);
+      if (!isNaN(parsed) && parsed >= 0 && parsed <= 9) return parsed;
+      return null;
+    };
+
     const handleKeyDown = (e: KeyboardEvent) => {
       const isInput =
         document.activeElement instanceof HTMLInputElement ||
@@ -375,7 +414,7 @@ export default function App() {
         document.activeElement instanceof HTMLSelectElement;
 
       // Escape always dismisses modals
-      if (e.key === 'Escape') {
+      if (e.key === 'Escape' || e.code === 'Escape') {
         if (isPaletteOpen) setIsPaletteOpen(false);
         if (isSettingsOpen) setIsSettingsOpen(false);
         if (isShortcutsOpen) setIsShortcutsOpen(false);
@@ -383,15 +422,15 @@ export default function App() {
         return;
       }
 
-      // Cmd+K or Ctrl+K -> Command Palette
-      if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+      // Cmd+K or Ctrl+K -> Command Palette (en: k, ru: л)
+      if ((e.ctrlKey || e.metaKey) && isKey(e, 'KeyK', 'k', 'л')) {
         e.preventDefault();
         setIsPaletteOpen((prev) => !prev);
         return;
       }
 
-      // Ctrl+B -> Toggle Mini HUD
-      if ((e.ctrlKey || e.metaKey) && (e.key === 'b' || e.key === 'B')) {
+      // Ctrl+B -> Toggle Mini HUD (en: b, ru: и)
+      if ((e.ctrlKey || e.metaKey) && isKey(e, 'KeyB', 'b', 'и')) {
         e.preventDefault();
         setSettings((prev) => ({
           ...prev,
@@ -400,56 +439,51 @@ export default function App() {
         return;
       }
 
-      // Ctrl+N -> New Snippet
-      if ((e.ctrlKey || e.metaKey) && (e.key === 'n' || e.key === 'N') && !e.shiftKey) {
+      // Ctrl+N -> New Snippet (en: n, ru: т)
+      if ((e.ctrlKey || e.metaKey) && isKey(e, 'KeyN', 'n', 'т') && !e.shiftKey) {
         e.preventDefault();
         setEditingSnippet('NEW');
         return;
       }
 
-      // Ctrl+D -> Switch Tab to Excel or Snippets
-      if ((e.ctrlKey || e.metaKey) && (e.key === 'd' || e.key === 'D')) {
+      // Ctrl+D -> Switch Tab to Excel or Snippets (en: d, ru: в)
+      if ((e.ctrlKey || e.metaKey) && isKey(e, 'KeyD', 'd', 'в')) {
         e.preventDefault();
         setActiveTab((prev) => (prev === 'excel' ? 'snippets' : 'excel'));
         return;
       }
 
+      const digit = getDigit(e);
+
       // Ctrl + 1..5 -> Switch specific Tab
-      if ((e.ctrlKey || e.metaKey) && ['1', '2', '3', '4', '5'].includes(e.key) && !e.altKey) {
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && digit !== null && digit >= 1 && digit <= 5) {
         e.preventDefault();
-        const tabMap: Record<string, ActiveTab> = {
-          '1': 'snippets',
-          '2': 'excel',
-          '3': 'placeholders',
-          '4': 'resources',
-          '5': 'notes',
-        };
-        const nextTab = tabMap[e.key];
+        const tabList: ActiveTab[] = ['snippets', 'excel', 'placeholders', 'resources', 'notes'];
+        const nextTab = tabList[digit - 1];
         if (nextTab) setActiveTab(nextTab);
         return;
       }
 
       // Alt + 1 through Alt + 9 -> Instant Copy
-      if (e.altKey && !e.ctrlKey && !e.metaKey && e.key >= '1' && e.key <= '9') {
+      if (e.altKey && !e.ctrlKey && !e.metaKey && digit !== null && digit >= 1 && digit <= 9) {
         e.preventDefault();
-        const num = parseInt(e.key, 10);
-        const explicit = snippets.find((s) => s.hotkey === `Alt+${num}`);
-        const target = explicit || snippets[num - 1];
+        const explicit = snippets.find((s) => s.hotkey === `Alt+${digit}`);
+        const target = explicit || snippets[digit - 1];
         if (target) {
           handleCopySnippet(target);
         }
         return;
       }
 
-      // Slash when not in input
-      if (e.key === '/' && !isInput) {
+      // Slash when not in input (en / or physical slash / Russian layout)
+      if (!isInput && (e.key === '/' || e.code === 'Slash' || e.code === 'NumpadDivide')) {
         e.preventDefault();
         setIsPaletteOpen(true);
         return;
       }
 
       // ? when not in input opens shortcuts cheat sheet
-      if (e.key === '?' && !isInput) {
+      if (!isInput && (e.key === '?' || (e.shiftKey && (e.code === 'Slash' || e.code === 'Digit7')))) {
         e.preventDefault();
         setIsShortcutsOpen(true);
         return;
@@ -506,10 +540,11 @@ export default function App() {
   }, [tables]);
 
   return (
-    <div className={`h-screen w-screen flex flex-col ${theme.bgApp} ${fontScale} overflow-hidden font-sans select-none`}>
-      {/* Native Desktop Window Controls (Active in Electron) */}
-      <DesktopTitleBar />
-
+    <div 
+      data-density={settings.density}
+      data-font-size={settings.fontSize}
+      className={`h-screen w-screen flex flex-col ${theme.bgApp} ${fontScale} overflow-hidden font-sans select-none`}
+    >
       {/* Desktop Header Bar */}
       <DesktopHeader
         settings={settings}
@@ -523,7 +558,6 @@ export default function App() {
         }}
         onOpenShortcuts={() => setIsShortcutsOpen(true)}
         onOpenPalette={() => setIsPaletteOpen(true)}
-        metrics={metrics}
         isMiniMode={settings.windowMode === 'mini-bar'}
         onToggleMiniMode={() =>
           setSettings((prev) => ({
@@ -555,14 +589,14 @@ export default function App() {
         </div>
       ) : (
         /* Full Workspace */
-        <div className="flex-1 overflow-hidden flex">
+        <div className="flex-1 overflow-hidden flex min-w-0">
           {/* Tab 1: Snippets & Live Composer with Draggable Resizer */}
           {activeTab === 'snippets' && (
-            <div className="flex-1 flex overflow-hidden">
+            <div className="flex-1 flex overflow-hidden min-w-0">
               {/* Left Column: Snippet Catalog */}
               <div
                 style={{ width: `${sidebarWidth}px` }}
-                className="w-full sm:w-auto shrink-0 h-full overflow-hidden transition-[width] duration-75"
+                className="w-full sm:w-auto shrink-0 max-w-[calc(100%-260px)] min-w-[260px] h-full overflow-hidden transition-[width] duration-75"
               >
                 <SnippetListPanel
                   snippets={snippets}
@@ -608,7 +642,7 @@ export default function App() {
               </div>
 
               {/* Right Column: Live Composer and Dynamic Resolver */}
-              <div className="hidden sm:flex flex-1 h-full min-w-[320px]">
+              <div className="hidden sm:flex flex-1 h-full min-w-0 overflow-hidden">
                 <LiveComposerAndResolver
                   selectedSnippet={selectedSnippet}
                   snippets={snippets}
@@ -625,7 +659,7 @@ export default function App() {
 
           {/* Tab 2: Excel Database with Tags */}
           {activeTab === 'excel' && (
-            <div className="flex-1 h-full overflow-hidden">
+            <div className="flex-1 h-full overflow-hidden min-w-0">
               <ExcelTableDatabasePanel
                 tables={tables}
                 activeTableId={activeTableId}
@@ -642,7 +676,7 @@ export default function App() {
 
           {/* Tab 3: Placeholder Customization & Database */}
           {activeTab === 'placeholders' && (
-            <div className="flex-1 h-full overflow-hidden">
+            <div className="flex-1 h-full overflow-hidden min-w-0">
               <PlaceholderManagerPanel
                 placeholders={placeholders}
                 onUpdatePlaceholders={setPlaceholders}
@@ -654,7 +688,7 @@ export default function App() {
 
           {/* Tab 4: Useful Links & Iframe Widgets */}
           {activeTab === 'resources' && (
-            <div className="flex-1 h-full overflow-hidden">
+            <div className="flex-1 h-full overflow-hidden min-w-0">
               <ResourcesAndWidgetsPanel
                 widgets={widgets}
                 onAddWidget={handleAddWidget}
@@ -667,7 +701,7 @@ export default function App() {
 
           {/* Tab 5: Shift Notes & Checklist Cards */}
           {activeTab === 'notes' && (
-            <div className="flex-1 h-full overflow-hidden">
+            <div className="flex-1 h-full overflow-hidden min-w-0">
               <NotesManagerPanel
                 notes={notes}
                 onCreateNote={handleCreateNote}
@@ -685,7 +719,6 @@ export default function App() {
 
       {/* Bottom Status Bar */}
       <ProductivityStatsBar
-        metrics={metrics}
         settings={settings}
         snippetCount={snippets.length}
         tableRowsCount={totalRowsCount}

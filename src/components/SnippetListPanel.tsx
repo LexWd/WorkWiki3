@@ -16,7 +16,7 @@ import {
   Sliders
 } from 'lucide-react';
 import { Snippet, SnippetCategory, PlaceholderConfig, ExcelRow, GuiSettings } from '../types';
-import { getThemeClasses, getAccentClasses } from '../utils/theme';
+import { getThemeClasses, getAccentClasses, getDensityPadding } from '../utils/theme';
 import { interpolateSnippet } from '../utils/interpolator';
 
 interface SnippetListPanelProps {
@@ -73,6 +73,7 @@ export const SnippetListPanel: React.FC<SnippetListPanelProps> = ({
 
   const theme = getThemeClasses(settings.theme);
   const accent = getAccentClasses(settings.accentColor);
+  const density = getDensityPadding(settings.density);
 
   // Filtered & sorted snippets
   const filteredSnippets = useMemo(() => {
@@ -109,7 +110,7 @@ export const SnippetListPanel: React.FC<SnippetListPanelProps> = ({
   return (
     <div className={`flex flex-col h-full border-r ${theme.border} ${theme.panel} overflow-hidden text-xs select-none`}>
       {/* Search and Quick Add Bar */}
-      <div className={`p-2.5 border-b ${theme.border} ${theme.panelHeader} space-y-2 shrink-0`}>
+      <div className={`${density.card} border-b ${theme.border} ${theme.panelHeader} ${density.spaceY} shrink-0`}>
         <div className="flex items-center gap-1.5">
           <div className="relative flex-1 min-w-0">
             <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 opacity-50 pointer-events-none" />
@@ -173,7 +174,7 @@ export const SnippetListPanel: React.FC<SnippetListPanelProps> = ({
       </div>
 
       {/* Snippet Card List */}
-      <div className="flex-1 overflow-y-auto p-2 space-y-2 divide-y-0">
+      <div className={`flex-1 overflow-y-auto ${density.container} ${density.spaceY} divide-y-0`}>
         {filteredSnippets.length === 0 ? (
           <div className="p-8 text-center text-slate-400 italic">
             Шаблоны не найдены. Попробуйте изменить поисковый запрос или создайте новый.
@@ -193,7 +194,7 @@ export const SnippetListPanel: React.FC<SnippetListPanelProps> = ({
               <div
                 key={snippet.id}
                 onClick={() => onSelectSnippet(snippet)}
-                className={`p-2.5 rounded-lg border transition-all cursor-pointer group ${
+                className={`${density.card} rounded-lg border transition-all cursor-pointer group ${
                   isSelected
                     ? `${accent.primaryMuted} border-sky-400/80 ring-1 ring-sky-400/30`
                     : `${theme.card} hover:border-slate-600`

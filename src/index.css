@@ -1,1 +1,54 @@
 @import "tailwindcss";
+
+/* Density variables and smooth transitions */
+:root {
+  --density-card-padding: 0.625rem;
+  --density-table-padding: 0.5rem 0.75rem;
+  --density-gap: 0.5rem;
+  --density-space: 0.5rem;
+}
+
+[data-density="compact"] {
+  --density-card-padding: 0.35rem 0.5rem;
+  --density-table-padding: 0.25rem 0.5rem;
+  --density-gap: 0.35rem;
+  --density-space: 0.35rem;
+}
+
+[data-density="comfortable"] {
+  --density-card-padding: 0.625rem 0.75rem;
+  --density-table-padding: 0.5rem 0.75rem;
+  --density-gap: 0.5rem;
+  --density-space: 0.5rem;
+}
+
+[data-density="spacious"] {
+  --density-card-padding: 0.9rem 1.1rem;
+  --density-table-padding: 0.75rem 1rem;
+  --density-gap: 0.85rem;
+  --density-space: 0.75rem;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Dynamic Font Scaling */
+html[data-font-size="sm"], body[data-font-size="sm"] {
+  font-size: 13.5px;
+  zoom: 0.92;
+}
+
+html[data-font-size="base"], body[data-font-size="base"] {
+  font-size: 15px;
+  zoom: 1;
+}
+
+html[data-font-size="lg"], body[data-font-size="lg"] {
+  font-size: 17px;
+  zoom: 1.1;
+}

@@ -180,7 +180,7 @@ export const QuickCommandPalette: React.FC<QuickCommandPaletteProps> = ({
             <span>↑ ↓ для выбора</span>
             <span>↵ для мгновенного копирования в буфер</span>
           </div>
-          <span className="text-emerald-400 font-mono">100% Офлайн</span>
+          <span className="font-mono text-slate-400">Esc для выхода</span>
         </div>
       </div>
     </div>
