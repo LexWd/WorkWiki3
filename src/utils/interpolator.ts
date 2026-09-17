@@ -1,9 +1,16 @@
 import { PlaceholderConfig, ExcelRow } from '../types';
 
 export function extractTokens(text: string): string[] {
-  const matches = text.match(/\{\{([a-zA-Zа-яА-Я0-9_-]+)\}\}/g);
+  // Support Cyrillic (including ё/Ё), Latin, digits, hyphens, underscores and whitespace trimming
+  const matches = text.match(/\{\{\s*([^{}\r\n]+?)\s*\}\}/g);
   if (!matches) return [];
-  const unique = Array.from(new Set(matches.map((m) => m.slice(2, -2).trim())));
+  const unique = Array.from(
+    new Set(
+      matches
+        .map((m) => m.replace(/^\{\{\s*/, '').replace(/\s*\}\}$/, '').trim())
+        .filter((k) => k.length > 0)
+    )
+  );
   return unique;
 }
 
@@ -15,29 +22,50 @@ export function resolveTokenValue(
   overrides: Record<string, string> = {}
 ): string {
   const cleanKey = tokenKey.trim();
+  const lowerKey = cleanKey.toLowerCase();
+  const normKey = lowerKey.replace(/ё/g, 'е');
 
   // 1. Check explicit overrides first (including empty string when user erases placeholder)
   if (cleanKey in overrides && overrides[cleanKey] !== undefined) {
     return overrides[cleanKey];
   }
 
-  // Check case-insensitive override
-  const lowerKey = cleanKey.toLowerCase();
+  // Check case-insensitive and ё/е normalized override
   for (const [k, v] of Object.entries(overrides)) {
     if (k.toLowerCase() === lowerKey && v !== undefined) {
+      return v;
+    }
+    if (k.toLowerCase().replace(/ё/g, 'е') === normKey && v !== undefined) {
       return v;
     }
   }
 
   // 2. Special built-in
-  if (cleanKey === 'имя_оператора' || cleanKey === 'agent_name') {
+  if (
+    lowerKey === 'имя_оператора' ||
+    lowerKey === 'agent_name' ||
+    normKey === 'имя_оператора'
+  ) {
     return agentName;
   }
 
-  // 3. Check placeholder config
-  const config = placeholders.find(
-    (p) => p.key.toLowerCase() === cleanKey.toLowerCase()
-  );
+  // 3. Check placeholder config (exact, case-insensitive, ё/е normalized, or label)
+  let config = placeholders.find((p) => p.key === cleanKey);
+  if (!config) {
+    config = placeholders.find((p) => p.key.toLowerCase() === lowerKey);
+  }
+  if (!config) {
+    config = placeholders.find(
+      (p) => p.key.toLowerCase().replace(/ё/g, 'е') === normKey
+    );
+  }
+  if (!config) {
+    config = placeholders.find(
+      (p) =>
+        p.label.toLowerCase() === lowerKey ||
+        p.label.toLowerCase().replace(/ё/g, 'е') === normKey
+    );
+  }
 
   if (config) {
     // Check if bound to active Excel row
@@ -58,7 +86,8 @@ export function resolveTokenValue(
       return activeRow.data[cleanKey];
     }
     for (const [colName, val] of Object.entries(activeRow.data)) {
-      if (colName.toLowerCase().replace(/\s+/g, '_') === cleanKey.toLowerCase()) {
+      const normCol = colName.toLowerCase().replace(/\s+/g, '_').replace(/ё/g, 'е');
+      if (normCol === normKey) {
         return val;
       }
     }
@@ -76,9 +105,10 @@ export function interpolateSnippet(
 ): { result: string; unresolved: string[] } {
   const unresolved: string[] = [];
 
-  const result = text.replace(/\{\{([a-zA-Zа-яА-Я0-9_-]+)\}\}/g, (match, key) => {
+  const result = text.replace(/\{\{\s*([^{}\r\n]+?)\s*\}\}/g, (match, rawKey) => {
+    const key = rawKey.trim();
     const val = resolveTokenValue(key, placeholders, activeRow, agentName, overrides);
-    if (val === match) {
+    if (val === match || val === `{{${key}}}`) {
       unresolved.push(key);
       return match;
     }

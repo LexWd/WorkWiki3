@@ -88,7 +88,7 @@ export function exportTableToXlsx(table: ExcelTable) {
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Данные');
 
-  const cleanName = table.name.replace(/[^a-zA-Zа-яА-Я0-9_-]/g, '_');
+  const cleanName = table.name.replace(/[^a-zA-Zа-яА-ЯёЁ0-9_-]/g, '_');
   XLSX.writeFile(workbook, `${cleanName}_${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
 
@@ -107,7 +107,7 @@ export function exportTableToCsv(table: ExcelTable) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  const cleanName = table.name.replace(/[^a-zA-Zа-яА-Я0-9_-]/g, '_');
+  const cleanName = table.name.replace(/[^a-zA-Zа-яА-ЯёЁ0-9_-]/g, '_');
   a.download = `${cleanName}_${new Date().toISOString().slice(0, 10)}.csv`;
   a.click();
   URL.revokeObjectURL(url);

@@ -117,7 +117,7 @@ export const LiveComposerAndResolver: React.FC<LiveComposerAndResolverProps> = (
 
     const cursor = e.target.selectionStart;
     const beforeCursor = val.slice(0, cursor);
-    const slashMatch = beforeCursor.match(/\/([a-zA-Zа-яА-Я0-9_]*)$/);
+    const slashMatch = beforeCursor.match(/\/([a-zA-Zа-яА-ЯёЁ0-9_]*)$/);
 
     if (slashMatch) {
       setSlashQuery(slashMatch[1]);
@@ -131,7 +131,7 @@ export const LiveComposerAndResolver: React.FC<LiveComposerAndResolverProps> = (
     const cursor = textareaRef.current.selectionStart;
     const beforeCursor = inputText.slice(0, cursor);
     const afterCursor = inputText.slice(cursor);
-    const slashMatch = beforeCursor.match(/\/([a-zA-Zа-яА-Я0-9_]*)$/);
+    const slashMatch = beforeCursor.match(/\/([a-zA-Zа-яА-ЯёЁ0-9_]*)$/);
 
     if (slashMatch) {
       const cleanBefore = beforeCursor.slice(0, slashMatch.index);

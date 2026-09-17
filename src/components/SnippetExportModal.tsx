@@ -91,7 +91,7 @@ export const SnippetExportModal: React.FC<SnippetExportModalProps> = ({
   const getDownloadFilename = () => {
     const name = (customCollectionName.trim() || selectedCollection)
       .toLowerCase()
-      .replace(/[^a-zа-я0-9_-]/gi, '_')
+      .replace(/[^a-zа-яё0-9_-]/gi, '_')
       .replace(/_+/g, '_');
     const dateStr = new Date().toISOString().slice(0, 10);
     return `snippets_${name || 'collection'}_${dateStr}.json`;

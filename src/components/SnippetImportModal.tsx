@@ -126,7 +126,7 @@ export const SnippetImportModal: React.FC<SnippetImportModalProps> = ({
 
         let shortcut = String(item.shortcut || item.command || '').trim();
         if (!shortcut) {
-          shortcut = '/' + title.toLowerCase().replace(/[^a-zа-я0-9]/gi, '_').slice(0, 15);
+          shortcut = '/' + title.toLowerCase().replace(/[^a-zа-яё0-9]/gi, '_').slice(0, 15);
         } else if (!shortcut.startsWith('/')) {
           shortcut = '/' + shortcut;
         }
