@@ -1,5 +1,5 @@
 import React from 'react';
-import { Database } from 'lucide-react';
+import { Database, History } from 'lucide-react';
 import { GuiSettings } from '../types';
 import { getThemeClasses } from '../utils/theme';
 
@@ -8,6 +8,8 @@ interface ProductivityStatsBarProps {
   snippetCount: number;
   tableRowsCount: number;
   placeholderCount: number;
+  historyCount?: number;
+  onOpenHistory?: () => void;
 }
 
 export const ProductivityStatsBar: React.FC<ProductivityStatsBarProps> = ({
@@ -15,6 +17,8 @@ export const ProductivityStatsBar: React.FC<ProductivityStatsBarProps> = ({
   snippetCount,
   tableRowsCount,
   placeholderCount,
+  historyCount = 0,
+  onOpenHistory,
 }) => {
   const theme = getThemeClasses(settings.theme);
 
@@ -38,6 +42,22 @@ export const ProductivityStatsBar: React.FC<ProductivityStatsBarProps> = ({
         <span className="text-slate-400 hidden sm:inline">
           <strong className="text-slate-200">{placeholderCount}</strong> плейсхолдеров
         </span>
+        {onOpenHistory && (
+          <>
+            <span className="text-slate-600 hidden md:inline">•</span>
+            <button
+              type="button"
+              onClick={onOpenHistory}
+              className="hidden md:flex items-center gap-1 text-slate-400 hover:text-sky-300 transition-colors cursor-pointer"
+              title="Открыть историю скопированных ответов"
+            >
+              <History className="w-3 h-3 text-sky-400" />
+              <span>
+                История: <strong className="text-slate-200">{historyCount}</strong>
+              </span>
+            </button>
+          </>
+        )}
       </div>
 
       {/* Right: Version info */}

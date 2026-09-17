@@ -9,11 +9,13 @@ import {
   Search,
   FileSpreadsheet,
   Globe,
-  StickyNote
+  StickyNote,
+  History
 } from 'lucide-react';
 import { GuiSettings, ActiveTab } from '../types';
 import { getThemeClasses, getAccentClasses, getDensityPadding } from '../utils/theme';
 import { soundService } from '../utils/sound';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface DesktopHeaderProps {
   settings: GuiSettings;
@@ -23,6 +25,7 @@ interface DesktopHeaderProps {
   onOpenSettings: () => void;
   onOpenShortcuts: () => void;
   onOpenPalette: () => void;
+  onOpenHistory?: () => void;
   isMiniMode: boolean;
   onToggleMiniMode: () => void;
   snippetCount: number;
@@ -30,6 +33,7 @@ interface DesktopHeaderProps {
   placeholderCount: number;
   resourceCount: number;
   noteCount: number;
+  historyCount?: number;
   onLogoClick?: () => void;
 }
 
@@ -40,6 +44,7 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({
   onOpenSettings,
   onOpenShortcuts,
   onOpenPalette,
+  onOpenHistory,
   isMiniMode,
   onToggleMiniMode,
   snippetCount,
@@ -47,6 +52,7 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({
   placeholderCount,
   resourceCount,
   noteCount,
+  historyCount = 0,
   onLogoClick,
 }) => {
   const theme = getThemeClasses(settings.theme);
@@ -163,6 +169,9 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({
 
       {/* Right Tools & Actions (Pinned to right, NEVER cut off or pushed out) */}
       <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 ml-auto z-30">
+        {/* In-app PWA install trigger (auto-detects installability) */}
+        <PWAInstallButton />
+
         {/* Quick Search / Command Palette trigger */}
         <button
           type="button"
@@ -186,6 +195,23 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({
         >
           <Keyboard className="w-3.5 h-3.5" />
         </button>
+
+        {/* Copy History Trigger */}
+        {onOpenHistory && (
+          <button
+            type="button"
+            onClick={onOpenHistory}
+            className="flex items-center gap-1 p-1.5 rounded-lg border border-slate-700/80 hover:bg-slate-800 text-slate-300 transition-colors shrink-0 cursor-pointer relative"
+            title="История скопированных ответов"
+          >
+            <History className="w-3.5 h-3.5 text-sky-400" />
+            {historyCount > 0 && (
+              <span className="font-mono text-[9px] px-1 py-0.2 rounded-full bg-sky-500/20 text-sky-300 font-bold border border-sky-500/30">
+                {historyCount > 9 ? '9+' : historyCount}
+              </span>
+            )}
+          </button>
+        )}
 
         {/* Mini Mode Toggle */}
         <button

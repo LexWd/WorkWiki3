@@ -16,7 +16,11 @@ import {
   FolderUp,
   Info,
   ChevronRight,
-  FileJson
+  FileJson,
+  ShieldCheck,
+  History,
+  RefreshCw,
+  Trash
 } from 'lucide-react';
 import { 
   GuiSettings, 
@@ -26,8 +30,10 @@ import {
   FontSizeScale, 
   Snippet, 
   ImportSnippetMode, 
-  SnippetCollectionExport 
+  SnippetCollectionExport,
+  AutoBackupPoint 
 } from '../types';
+import { storage } from '../utils/storage';
 import { getThemeClasses, getAccentClasses } from '../utils/theme';
 import { SnippetExportModal } from './SnippetExportModal';
 import { SnippetImportModal } from './SnippetImportModal';
@@ -41,6 +47,7 @@ interface GuiCustomizationModalProps {
   onExportData: () => void;
   onImportData: (file: File) => void;
   onResetData: () => void;
+  onRestoreAutoBackup?: (backup: AutoBackupPoint) => void;
   // Snippet Collection Import & Export
   snippets: Snippet[];
   onImportSnippets: (
@@ -76,6 +83,7 @@ export const GuiCustomizationModal: React.FC<GuiCustomizationModalProps> = ({
   onExportData,
   onImportData,
   onResetData,
+  onRestoreAutoBackup,
   snippets,
   onImportSnippets,
   initialSection = 'gui',
@@ -86,10 +94,18 @@ export const GuiCustomizationModal: React.FC<GuiCustomizationModalProps> = ({
   const [isImportCollectionOpen, setIsImportCollectionOpen] = useState(false);
   const [selectedCategoryForExport, setSelectedCategoryForExport] = useState<string>('Все');
   const [isResetAllConfirmOpen, setIsResetAllConfirmOpen] = useState(false);
+  const [autoBackups, setAutoBackups] = useState<AutoBackupPoint[]>([]);
+  const [backupToRestore, setBackupToRestore] = useState<AutoBackupPoint | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const theme = getThemeClasses(settings.theme);
   const accent = getAccentClasses(settings.accentColor);
+
+  useEffect(() => {
+    if (isOpen) {
+      setAutoBackups(storage.loadAutoBackups());
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     if (isOpen && initialSection) {
@@ -493,6 +509,78 @@ export const GuiCustomizationModal: React.FC<GuiCustomizationModalProps> = ({
                   </button>
                 </div>
 
+                {/* Auto-backups local snapshots manager */}
+                <div className="pt-3 border-t border-slate-800/80 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-semibold text-xs text-slate-200 flex items-center gap-1.5">
+                        <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                        <span>Локальные снимки безопасности (Auto-Backups)</span>
+                      </div>
+                      <p className="text-[11px] text-slate-400">
+                        Автоматические точки отката при опасных действиях и сбросе. Хранятся локально в браузере (до 10 снимков).
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newPt = storage.createAutoBackup('Ручной снимок из настроек');
+                        if (newPt) {
+                          setAutoBackups(storage.loadAutoBackups());
+                          onNotification?.('Создан снимок безопасности рабочего пространства');
+                        }
+                      }}
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold shrink-0 cursor-pointer"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5 text-sky-400" />
+                      <span>Создать снимок</span>
+                    </button>
+                  </div>
+
+                  {autoBackups.length === 0 ? (
+                    <div className="p-3 rounded-lg border border-slate-800/60 bg-slate-900/30 text-center text-slate-500 text-xs">
+                      Нет сохранённых снимков. Нажмите «Создать снимок», чтобы зафиксировать текущее состояние.
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                      {autoBackups.map((b) => {
+                        const dateStr = new Date(b.createdAt).toLocaleString('ru-RU', {
+                          day: 'numeric',
+                          month: 'short',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        });
+                        return (
+                          <div
+                            key={b.id}
+                            className="flex items-center justify-between p-2 rounded-lg border border-slate-800 bg-slate-900/60 hover:bg-slate-900 text-xs transition-colors"
+                          >
+                            <div className="min-w-0 flex-1 pr-2">
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold text-slate-200 truncate">{b.reason}</span>
+                                <span className="text-[10px] text-slate-400 font-mono shrink-0">{dateStr}</span>
+                              </div>
+                              <div className="text-[10.5px] text-slate-400 mt-0.5">
+                                Шаблонов: {b.counts.snippets} • Таблиц: {b.counts.tables} • Плейсхолдеров: {b.counts.placeholders}
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => setBackupToRestore(b)}
+                              className="flex items-center gap-1 px-2 py-1 rounded bg-sky-600/20 hover:bg-sky-600/40 text-sky-300 border border-sky-500/30 text-[11px] font-semibold shrink-0 cursor-pointer"
+                            >
+                              <History className="w-3 h-3" />
+                              <span>Откатить</span>
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
                 {/* Reset Section */}
                 <div className="pt-4 border-t border-slate-800/80">
                   <div className="p-3 rounded-lg border border-rose-900/40 bg-rose-950/20 flex items-center justify-between gap-3">
@@ -582,6 +670,31 @@ export const GuiCustomizationModal: React.FC<GuiCustomizationModalProps> = ({
           setIsResetAllConfirmOpen(false);
         }}
         onCancel={() => setIsResetAllConfirmOpen(false)}
+      />
+
+      {/* Confirmation: Restore Auto-Backup Point */}
+      <ConfirmDialogModal
+        isOpen={backupToRestore !== null}
+        title="Восстановить снимок безопасности?"
+        description={
+          backupToRestore
+            ? `Откатить систему до состояния снимка от ${new Date(
+                backupToRestore.createdAt
+              ).toLocaleString('ru-RU')} («${backupToRestore.reason}»)? Текущие несохраненные изменения будут заменены содержимым снимка.`
+            : ''
+        }
+        confirmText="Восстановить снимок"
+        cancelText="Отмена"
+        variant="warning"
+        icon="reset"
+        onConfirm={() => {
+          if (backupToRestore && onRestoreAutoBackup) {
+            onRestoreAutoBackup(backupToRestore);
+            setBackupToRestore(null);
+            onNotification?.('Состояние системы восстановлено из снимка');
+          }
+        }}
+        onCancel={() => setBackupToRestore(null)}
       />
     </>
   );

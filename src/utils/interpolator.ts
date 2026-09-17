@@ -16,9 +16,17 @@ export function resolveTokenValue(
 ): string {
   const cleanKey = tokenKey.trim();
 
-  // 1. Check explicit overrides first
-  if (cleanKey in overrides && overrides[cleanKey] !== undefined && overrides[cleanKey] !== '') {
+  // 1. Check explicit overrides first (including empty string when user erases placeholder)
+  if (cleanKey in overrides && overrides[cleanKey] !== undefined) {
     return overrides[cleanKey];
+  }
+
+  // Check case-insensitive override
+  const lowerKey = cleanKey.toLowerCase();
+  for (const [k, v] of Object.entries(overrides)) {
+    if (k.toLowerCase() === lowerKey && v !== undefined) {
+      return v;
+    }
   }
 
   // 2. Special built-in

@@ -10,7 +10,8 @@ import {
   CheckCircle2, 
   ExternalLink,
   Keyboard,
-  Info
+  Info,
+  X
 } from 'lucide-react';
 import { Snippet, PlaceholderConfig, ExcelRow, GuiSettings } from '../types';
 import { getThemeClasses, getAccentClasses, getDensityPadding } from '../utils/theme';
@@ -148,9 +149,11 @@ export const LiveComposerAndResolver: React.FC<LiveComposerAndResolverProps> = (
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleSetOverride = (tokenKey: string, value: string) => {
+  const handleSetOverride = (tokenKey: string, value: string, playSound = false) => {
     setTokenOverrides((prev) => ({ ...prev, [tokenKey]: value }));
-    soundService.playClick(settings.soundEffects);
+    if (playSound) {
+      soundService.playClick(settings.soundEffects);
+    }
   };
 
   const handleResetOverrides = () => {
@@ -374,7 +377,12 @@ export const LiveComposerAndResolver: React.FC<LiveComposerAndResolverProps> = (
                       </div>
 
                       <div className="text-[10.5px] text-slate-300 font-medium truncate max-w-[200px]">
-                        Выбрано: <span className="text-emerald-300 font-semibold">{currentVal}</span>
+                        Выбрано:{' '}
+                        {currentVal !== '' ? (
+                          <span className="text-emerald-300 font-semibold">{currentVal}</span>
+                        ) : (
+                          <span className="text-slate-500 italic font-normal">(пусто)</span>
+                        )}
                       </div>
                     </div>
 
@@ -387,29 +395,50 @@ export const LiveComposerAndResolver: React.FC<LiveComposerAndResolverProps> = (
                             <button
                               key={opt}
                               type="button"
-                              onClick={() => handleSetOverride(tokenKey, opt)}
-                              className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all ${
+                              onClick={() => handleSetOverride(tokenKey, isSelected ? '' : opt, true)}
+                              className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all cursor-pointer ${
                                 isSelected
                                   ? 'bg-purple-600 text-white font-bold shadow-sm ring-1 ring-purple-400'
                                   : 'bg-slate-800/90 hover:bg-slate-700 text-slate-300 border border-slate-700/60'
                               }`}
+                              title={isSelected ? 'Нажмите, чтобы снять выбор (сделать пустым)' : undefined}
                             >
                               {opt}
                               {isSelected && ' ✓'}
                             </button>
                           );
                         })}
+                        {currentVal !== '' && (
+                          <button
+                            type="button"
+                            onClick={() => handleSetOverride(tokenKey, '', true)}
+                            className="px-2 py-1 rounded text-[10.5px] text-slate-400 hover:text-rose-300 border border-slate-800 hover:border-slate-700 bg-slate-900/60 hover:bg-slate-800 transition-colors cursor-pointer"
+                            title="Стереть выбор (пустая строка)"
+                          >
+                            Очистить
+                          </button>
+                        )}
                       </div>
                     ) : (
                       /* Text input field */
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5">
                         <input
                           type="text"
                           value={currentVal}
-                          onChange={(e) => handleSetOverride(tokenKey, e.target.value)}
-                          placeholder={`Значение для {{${tokenKey}}}`}
-                          className={`flex-1 p-1 rounded border text-xs outline-none ${theme.input}`}
+                          onChange={(e) => handleSetOverride(tokenKey, e.target.value, false)}
+                          placeholder={`Значение для {{${tokenKey}}} (пусто)`}
+                          className={`flex-1 p-1 px-2 rounded border text-xs outline-none ${theme.input}`}
                         />
+                        {currentVal !== '' && (
+                          <button
+                            type="button"
+                            onClick={() => handleSetOverride(tokenKey, '', true)}
+                            className="p-1 text-slate-500 hover:text-slate-300 hover:bg-slate-800 rounded transition-colors cursor-pointer shrink-0"
+                            title="Стереть значение (сделать пустым)"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>

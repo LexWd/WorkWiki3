@@ -1,4 +1,4 @@
-import { Snippet, PlaceholderConfig, ExcelTable, GuiSettings, ProductivityMetrics, ResourceWidget, NoteCard } from '../types';
+import { Snippet, PlaceholderConfig, ExcelTable, GuiSettings, ProductivityMetrics, ResourceWidget, NoteCard, CopyHistoryItem, AutoBackupPoint } from '../types';
 import { 
   DEFAULT_SNIPPETS, 
   DEFAULT_PLACEHOLDERS, 
@@ -19,6 +19,8 @@ const WIDGETS_KEY = 'quickreply_ru_widgets_v2';
 const NOTES_KEY = 'quickreply_ru_notes_v2';
 const ALL_CATEGORIES_KEY = 'quickreply_ru_all_categories_v3';
 const LEGACY_CUSTOM_CATEGORIES_KEY = 'quickreply_ru_custom_categories_v2';
+const COPY_HISTORY_KEY = 'quickreply_ru_copy_history_v1';
+const AUTO_BACKUPS_KEY = 'quickreply_ru_auto_backups_v1';
 
 export const storage = {
   loadCategories(): string[] {
@@ -273,7 +275,98 @@ export const storage = {
     }
   },
 
+  loadCopyHistory(): CopyHistoryItem[] {
+    try {
+      const data = localStorage.getItem(COPY_HISTORY_KEY);
+      if (data) {
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {
+      console.warn('Failed to load copy history:', e);
+    }
+    return [];
+  },
+
+  saveCopyHistory(history: CopyHistoryItem[]) {
+    try {
+      localStorage.setItem(COPY_HISTORY_KEY, JSON.stringify(history.slice(0, 30)));
+    } catch (e) {
+      console.error('Failed to save copy history:', e);
+    }
+  },
+
+  clearCopyHistory() {
+    localStorage.removeItem(COPY_HISTORY_KEY);
+  },
+
+  loadAutoBackups(): AutoBackupPoint[] {
+    try {
+      const data = localStorage.getItem(AUTO_BACKUPS_KEY);
+      if (data) {
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {
+      console.warn('Failed to load auto-backups:', e);
+    }
+    return [];
+  },
+
+  saveAutoBackups(backups: AutoBackupPoint[]) {
+    try {
+      localStorage.setItem(AUTO_BACKUPS_KEY, JSON.stringify(backups.slice(0, 10)));
+    } catch (e) {
+      console.error('Failed to save auto-backups:', e);
+    }
+  },
+
+  createAutoBackup(reason: string): AutoBackupPoint | null {
+    try {
+      const existing = this.loadAutoBackups();
+      const snippets = this.loadSnippets();
+      const placeholders = this.loadPlaceholders();
+      const tables = this.loadExcelTables();
+      const widgets = this.loadResourceWidgets();
+      const notes = this.loadNotes();
+      const categories = this.loadCategories();
+      const settings = this.loadSettings();
+
+      const newPoint: AutoBackupPoint = {
+        id: `ab-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        createdAt: Date.now(),
+        reason,
+        counts: {
+          snippets: snippets.length,
+          tables: tables.length,
+          placeholders: placeholders.length,
+          notes: notes.length,
+          widgets: widgets.length,
+        },
+        data: {
+          snippets,
+          placeholders,
+          tables,
+          widgets,
+          notes,
+          categories,
+          settings,
+        },
+      };
+
+      const updated = [newPoint, ...existing].slice(0, 10);
+      this.saveAutoBackups(updated);
+      return newPoint;
+    } catch (e) {
+      console.error('Failed to create auto backup:', e);
+      return null;
+    }
+  },
+
   resetAllData() {
+    // Before wiping, save a safety rollback snapshot
+    this.createAutoBackup('Снимок перед сбросом к начальным данным');
+
     localStorage.removeItem(SNIPPETS_KEY);
     localStorage.removeItem(PLACEHOLDERS_KEY);
     localStorage.removeItem(TABLES_KEY);
@@ -283,5 +376,6 @@ export const storage = {
     localStorage.removeItem(METRICS_KEY);
     localStorage.removeItem(ALL_CATEGORIES_KEY);
     localStorage.removeItem(LEGACY_CUSTOM_CATEGORIES_KEY);
+    localStorage.removeItem(COPY_HISTORY_KEY);
   },
 };

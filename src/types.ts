@@ -155,6 +155,37 @@ export interface ProductivityMetrics {
   sessionStartTime: number;
 }
 
+export interface CopyHistoryItem {
+  id: string;
+  snippetId?: string;
+  title: string;
+  category?: string;
+  text: string;
+  copiedAt: number;
+}
+
+export interface AutoBackupPoint {
+  id: string;
+  createdAt: number;
+  reason: string;
+  counts: {
+    snippets: number;
+    tables: number;
+    placeholders: number;
+    notes: number;
+    widgets: number;
+  };
+  data: {
+    snippets: Snippet[];
+    placeholders: PlaceholderConfig[];
+    tables: ExcelTable[];
+    widgets: ResourceWidget[];
+    notes: NoteCard[];
+    categories: string[];
+    settings?: GuiSettings;
+  };
+}
+
 export interface ElectronAPI {
   isElectron: boolean;
   platform: string;

@@ -3,6 +3,7 @@ import {
   Search, 
   Plus, 
   Pin, 
+  Star,
   Copy, 
   Check, 
   Tag, 
@@ -67,19 +68,26 @@ export const SnippetListPanel: React.FC<SnippetListPanelProps> = ({
 
   // Derive dynamic list of categories from categories prop
   const availableCategories = useMemo(() => {
-    return ['Все', ...categories];
+    return ['Все', '⭐ Избранные', ...categories];
   }, [categories]);
 
   const theme = getThemeClasses(settings.theme);
   const accent = getAccentClasses(settings.accentColor);
   const density = getDensityPadding(settings.density);
 
+  const pinnedCount = useMemo(() => {
+    return snippets.filter((s) => s.isPinned).length;
+  }, [snippets]);
+
   // Filtered & sorted snippets
   const filteredSnippets = useMemo(() => {
     return snippets
       .filter((s) => {
-        const matchesCategory = selectedCategory === 'Все' || s.category === selectedCategory;
-        if (!matchesCategory) return false;
+        if (selectedCategory === '⭐ Избранные') {
+          if (!s.isPinned) return false;
+        } else if (selectedCategory !== 'Все') {
+          if (s.category !== selectedCategory) return false;
+        }
 
         if (!searchQuery) return true;
         const q = searchQuery.toLowerCase().trim();
@@ -122,8 +130,9 @@ export const SnippetListPanel: React.FC<SnippetListPanelProps> = ({
 
   const currentCategorySnippetCount = useMemo(() => {
     if (selectedCategory === 'Все') return snippets.length;
+    if (selectedCategory === '⭐ Избранные') return pinnedCount;
     return snippets.filter((s) => s.category === selectedCategory).length;
-  }, [snippets, selectedCategory]);
+  }, [snippets, selectedCategory, pinnedCount]);
 
   return (
     <div className={`flex flex-col h-full border-r ${theme.border} ${theme.panel} overflow-hidden text-xs select-none`}>
@@ -363,21 +372,25 @@ export const SnippetListPanel: React.FC<SnippetListPanelProps> = ({
                 {/* Header row */}
                 <div className="flex items-start justify-between gap-1.5 mb-1">
                   <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                    {/* Pin button */}
+                    {/* Pin / Favorite button */}
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         onTogglePin(snippet.id);
                       }}
-                      className={`p-0.5 rounded transition-colors shrink-0 ${
+                      className={`p-0.5 rounded transition-colors shrink-0 cursor-pointer ${
                         snippet.isPinned
-                          ? 'text-amber-400 hover:text-amber-300'
-                          : 'text-slate-500 opacity-0 group-hover:opacity-100 hover:text-slate-300'
+                          ? 'text-amber-400 hover:text-amber-300 scale-105'
+                          : 'text-slate-500 opacity-0 group-hover:opacity-100 hover:text-amber-400'
                       }`}
-                      title={snippet.isPinned ? 'Открепить' : 'Закрепить наверху'}
+                      title={snippet.isPinned ? 'Убрать из избранного (открепить)' : 'Добавить в избранное (закрепить наверху)'}
                     >
-                      <Pin className="w-3.5 h-3.5 fill-current" />
+                      {snippet.isPinned ? (
+                        <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                      ) : (
+                        <Star className="w-3.5 h-3.5" />
+                      )}
                     </button>
 
                     <h3 className="font-semibold text-slate-100 truncate text-[12.5px]">
