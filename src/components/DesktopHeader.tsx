@@ -10,7 +10,8 @@ import {
   FileSpreadsheet,
   Globe,
   StickyNote,
-  History
+  History,
+  HardDrive
 } from 'lucide-react';
 import { GuiSettings, ActiveTab } from '../types';
 import { getThemeClasses, getAccentClasses, getDensityPadding } from '../utils/theme';
@@ -35,6 +36,7 @@ interface DesktopHeaderProps {
   noteCount: number;
   historyCount?: number;
   onLogoClick?: () => void;
+  onOpenBackupModal?: () => void;
 }
 
 export const DesktopHeader: React.FC<DesktopHeaderProps> = ({
@@ -45,6 +47,7 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({
   onOpenShortcuts,
   onOpenPalette,
   onOpenHistory,
+  onOpenBackupModal,
   isMiniMode,
   onToggleMiniMode,
   snippetCount,
@@ -210,6 +213,19 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({
                 {historyCount > 9 ? '9+' : historyCount}
               </span>
             )}
+          </button>
+        )}
+
+        {/* Full Backup Trigger */}
+        {onOpenBackupModal && (
+          <button
+            type="button"
+            onClick={onOpenBackupModal}
+            className="flex items-center gap-1 px-2 py-1.5 rounded-lg border border-emerald-500/40 bg-emerald-950/30 hover:bg-emerald-900/40 text-emerald-300 text-xs font-semibold transition-all shrink-0 cursor-pointer shadow-xs active:scale-95"
+            title="Полный бэкап в один клик (All-in-One JSON сохранение и восстановление)"
+          >
+            <HardDrive className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="hidden lg:inline">Бэкап</span>
           </button>
         )}
 

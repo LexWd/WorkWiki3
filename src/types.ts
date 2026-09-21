@@ -164,6 +164,34 @@ export interface CopyHistoryItem {
   copiedAt: number;
 }
 
+export interface LogicBlockInfo {
+  raw: string;
+  condition: string;
+  variableKey: string;
+  operator: 'exists' | 'not_exists' | 'equals' | 'not_equals';
+  expectedValue?: string;
+  ifTrue: string;
+  ifFalse?: string;
+  isMatched?: boolean;
+}
+
+export interface FullBackupPayload {
+  format: 'quickreply-desk-full-backup';
+  version: string;
+  exportedAt: string;
+  snippets: Snippet[];
+  categories: string[];
+  placeholders: PlaceholderConfig[];
+  tables: ExcelTable[];
+  widgets: ResourceWidget[];
+  resourceCategories: string[];
+  notes: NoteCard[];
+  notesScratchpad?: string;
+  settings: GuiSettings;
+  metrics: ProductivityMetrics;
+  copyHistory?: CopyHistoryItem[];
+}
+
 export interface AutoBackupPoint {
   id: string;
   createdAt: number;

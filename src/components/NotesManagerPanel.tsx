@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { 
   Plus, 
   Search, 
@@ -16,11 +16,20 @@ import {
   Clock, 
   Sparkles,
   Filter,
-  Layers
+  Layers,
+  FileEdit,
+  Save,
+  RotateCcw,
+  ChevronDown,
+  ChevronUp,
+  FilePlus,
+  Send,
+  CheckCheck
 } from 'lucide-react';
 import { NoteCard, NoteCardColor, GuiSettings } from '../types';
 import { getThemeClasses, getAccentClasses } from '../utils/theme';
 import { soundService } from '../utils/sound';
+import { storage } from '../utils/storage';
 import { NoteEditorModal } from './NoteEditorModal';
 import { ConfirmDialogModal } from './ConfirmDialogModal';
 
@@ -111,6 +120,18 @@ export const NotesManagerPanel: React.FC<NotesManagerPanelProps> = ({
 
   const [editingNote, setEditingNote] = useState<NoteCard | null | 'NEW'>(null);
   const [noteToDelete, setNoteToDelete] = useState<NoteCard | null>(null);
+
+  // Quick scratchpad state with instant auto-save to local storage
+  const [scratchpadText, setScratchpadText] = useState(() => storage.loadNotesScratchpad());
+  const [isScratchpadOpen, setIsScratchpadOpen] = useState(true);
+  const [scratchpadStatus, setScratchpadStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [lastScratchpadTime, setLastScratchpadTime] = useState<string | null>(null);
+  const scratchpadDebounceRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Inline card editing with instant auto-save to local storage
+  const [inlineEditingNoteId, setInlineEditingNoteId] = useState<string | null>(null);
+  const [inlineSaveStatus, setInlineSaveStatus] = useState<Record<string, { status: 'idle' | 'saving' | 'saved'; time?: string }>>({});
+  const inlineDebounceRef = useRef<Record<string, NodeJS.Timeout>>({});
 
   const theme = getThemeClasses(settings.theme);
   const accent = getAccentClasses(settings.accentColor);
@@ -213,6 +234,131 @@ export const NotesManagerPanel: React.FC<NotesManagerPanelProps> = ({
       isPinned: !note.isPinned,
       updatedAt: Date.now(),
     });
+  };
+
+  // Autosave handlers for scratchpad
+  const handleScratchpadChange = (newText: string) => {
+    setScratchpadText(newText);
+    setScratchpadStatus('saving');
+
+    // Instant local storage persist
+    storage.saveNotesScratchpad(newText);
+
+    if (scratchpadDebounceRef.current) {
+      clearTimeout(scratchpadDebounceRef.current);
+    }
+    scratchpadDebounceRef.current = setTimeout(() => {
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      setScratchpadStatus('saved');
+      setLastScratchpadTime(timeStr);
+    }, 200);
+  };
+
+  const handleCreateCardFromScratchpad = () => {
+    const trimmed = scratchpadText.trim();
+    if (!trimmed) return;
+
+    const lines = trimmed.split('\n');
+    const title = lines[0].slice(0, 80) || 'Заметка из блокнота';
+    const content = lines.length > 1 ? lines.slice(1).join('\n').trim() : lines[0];
+
+    const newNote: NoteCard = {
+      id: `note-${Date.now()}`,
+      title,
+      content,
+      category: categories[0] || 'Текущая смена',
+      color: 'amber',
+      isPinned: false,
+      tags: ['блокнот'],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+
+    const createFn = onAddNote || onCreateNote;
+    if (createFn) {
+      createFn(newNote);
+    }
+    const currentNotes = storage.loadNotes();
+    storage.saveNotes([newNote, ...currentNotes]);
+
+    setScratchpadText('');
+    storage.saveNotesScratchpad('');
+    setScratchpadStatus('idle');
+    setLastScratchpadTime(null);
+    onNotification?.('Заметка создана из оперативного блокнота!');
+    soundService.playSuccess(settings.soundEffects);
+  };
+
+  const handleCopyScratchpad = () => {
+    if (!scratchpadText) return;
+    navigator.clipboard.writeText(scratchpadText);
+    soundService.playCopyChime(settings.soundEffects);
+    onNotification?.('Текст оперативного блокнота скопирован!');
+  };
+
+  const handleClearScratchpad = () => {
+    if (!scratchpadText) return;
+    setScratchpadText('');
+    storage.saveNotesScratchpad('');
+    setScratchpadStatus('idle');
+    setLastScratchpadTime(null);
+    onNotification?.('Оперативный блокнот очищен');
+  };
+
+  // Inline editing handlers for note cards
+  const toggleInlineEdit = (noteId: string) => {
+    setInlineEditingNoteId((prev) => (prev === noteId ? null : noteId));
+  };
+
+  const handleInlineTitleChange = (note: NoteCard, newTitle: string) => {
+    const noteId = note.id;
+    setInlineSaveStatus((prev) => ({ ...prev, [noteId]: { status: 'saving' } }));
+
+    const updatedNote: NoteCard = {
+      ...note,
+      title: newTitle,
+      updatedAt: Date.now(),
+    };
+    onUpdateNote(updatedNote);
+
+    const currentNotes = storage.loadNotes();
+    const nextNotes = currentNotes.map((n) => (n.id === noteId ? updatedNote : n));
+    storage.saveNotes(nextNotes);
+
+    if (inlineDebounceRef.current[noteId]) {
+      clearTimeout(inlineDebounceRef.current[noteId]);
+    }
+    inlineDebounceRef.current[noteId] = setTimeout(() => {
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      setInlineSaveStatus((prev) => ({ ...prev, [noteId]: { status: 'saved', time: timeStr } }));
+    }, 200);
+  };
+
+  const handleInlineContentChange = (note: NoteCard, newContent: string) => {
+    const noteId = note.id;
+    setInlineSaveStatus((prev) => ({ ...prev, [noteId]: { status: 'saving' } }));
+
+    const updatedNote: NoteCard = {
+      ...note,
+      content: newContent,
+      updatedAt: Date.now(),
+    };
+    onUpdateNote(updatedNote);
+
+    const currentNotes = storage.loadNotes();
+    const nextNotes = currentNotes.map((n) => (n.id === noteId ? updatedNote : n));
+    storage.saveNotes(nextNotes);
+
+    if (inlineDebounceRef.current[noteId]) {
+      clearTimeout(inlineDebounceRef.current[noteId]);
+    }
+    inlineDebounceRef.current[noteId] = setTimeout(() => {
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      setInlineSaveStatus((prev) => ({ ...prev, [noteId]: { status: 'saved', time: timeStr } }));
+    }, 200);
   };
 
   return (
@@ -344,7 +490,107 @@ export const NotesManagerPanel: React.FC<NotesManagerPanelProps> = ({
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-5">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {/* Quick Shift Scratchpad with Instant Auto-save to LocalStorage */}
+        <div className={`rounded-xl border shadow-sm transition-all overflow-hidden ${theme.panelHeader} ${theme.border}`}>
+          <div className="p-2.5 sm:p-3 flex items-center justify-between gap-3 bg-slate-900/70 border-b border-slate-800/80">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className={`w-6 h-6 rounded flex items-center justify-center font-bold text-xs shrink-0 ${accent.primary}`}>
+                <FileEdit className="w-3.5 h-3.5" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-bold text-xs text-slate-100">
+                    Оперативный блокнот смены
+                  </h3>
+                  {/* Status Indicator */}
+                  {scratchpadStatus === 'saving' ? (
+                    <span className="text-[10px] text-amber-300 flex items-center gap-1 font-medium bg-amber-950/60 px-2 py-0.5 rounded border border-amber-800/80 animate-pulse">
+                      <Clock className="w-3 h-3 text-amber-400 shrink-0" />
+                      <span>Сохранение...</span>
+                    </span>
+                  ) : scratchpadStatus === 'saved' || lastScratchpadTime ? (
+                    <span className="text-[10px] text-emerald-300 flex items-center gap-1 font-medium bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/80">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
+                      <span>Автосохранено {lastScratchpadTime ? `(${lastScratchpadTime})` : ''}</span>
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-sky-400 flex items-center gap-1 font-medium bg-sky-950/40 px-2 py-0.5 rounded border border-sky-800/60">
+                      <Sparkles className="w-3 h-3 text-sky-400 shrink-0" />
+                      <span>Мгновенное автосохранение</span>
+                    </span>
+                  )}
+                </div>
+                <p className="text-[10.5px] text-slate-400 hidden sm:block truncate">
+                  Любой введённый текст сразу фиксируется в локальном хранилище браузера без нажатия кнопок
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 shrink-0">
+              {scratchpadText.trim() && (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleCreateCardFromScratchpad}
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer ${accent.primary}`}
+                    title="Создать постоянную карточку из текста блокнота"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">В карточки</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCopyScratchpad}
+                    className="flex items-center gap-1 px-2 py-1 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors cursor-pointer"
+                    title="Скопировать весь текст блокнота"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Копировать</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleClearScratchpad}
+                    className="p-1 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800/80 transition-colors cursor-pointer"
+                    title="Очистить блокнот"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                  </button>
+                </>
+              )}
+              <button
+                type="button"
+                onClick={() => setIsScratchpadOpen(!isScratchpadOpen)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+                title={isScratchpadOpen ? 'Свернуть блокнот' : 'Развернуть блокнот'}
+              >
+                {isScratchpadOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+
+          {isScratchpadOpen && (
+            <div className="p-3 bg-slate-950/40 space-y-2">
+              <textarea
+                value={scratchpadText}
+                onChange={(e) => handleScratchpadChange(e.target.value)}
+                placeholder="Оперативные заметки, телефоны, номера заказов, черновики ответов... Печатайте здесь — каждый символ сохраняется моментально!"
+                rows={3}
+                className={`w-full p-2.5 rounded-lg border text-xs font-sans leading-relaxed outline-none transition-all resize-y min-h-[75px] max-h-[220px] ${theme.input} focus:border-sky-500`}
+              />
+              <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono">
+                <span className="flex items-center gap-1.5 text-slate-400">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                  Символов: {scratchpadText.length} | Строк: {scratchpadText ? scratchpadText.split('\n').length : 0}
+                </span>
+                <span className="text-[10px] text-slate-400 hidden sm:inline">
+                  Локальное хранилище: данные защищены от случайного закрытия вкладки
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+
         {filteredNotes.length === 0 ? (
           /* Empty State */
           <div className="h-64 flex flex-col items-center justify-center text-center p-6 rounded-xl border border-dashed border-slate-700 bg-slate-900/30">
@@ -484,8 +730,74 @@ export const NotesManagerPanel: React.FC<NotesManagerPanelProps> = ({
     const isCopied = copiedNoteId === note.id;
     const checklistItems = note.checklist || [];
     const completedCount = checklistItems.filter((i) => i.completed).length;
+    const isInlineEditing = inlineEditingNoteId === note.id;
+    const cardSaveState = inlineSaveStatus[note.id];
 
     if (viewMode === 'list') {
+      if (isInlineEditing) {
+        return (
+          <div
+            key={note.id}
+            className={`p-3 rounded-xl border transition-all flex flex-col gap-2.5 ${style.cardBg} ${style.cardBorder} ring-1 ring-sky-500/50 shadow-md`}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className={`w-2 h-2 rounded-full shrink-0 ${style.dotColor}`}></span>
+                <span className={`text-[10px] px-2 py-0.5 rounded font-medium ${style.badgeBg} ${style.badgeText}`}>
+                  {note.category}
+                </span>
+                {/* Auto-save status */}
+                {cardSaveState?.status === 'saving' ? (
+                  <span className="text-[10px] text-amber-300 flex items-center gap-1 font-medium bg-amber-950/60 px-1.5 py-0.5 rounded border border-amber-800/80 animate-pulse">
+                    <Clock className="w-3 h-3 text-amber-400" />
+                    <span>Сохранение...</span>
+                  </span>
+                ) : cardSaveState?.status === 'saved' || cardSaveState?.time ? (
+                  <span className="text-[10px] text-emerald-300 flex items-center gap-1 font-medium bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-800/80">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                    <span>Автосохранено {cardSaveState?.time ? `(${cardSaveState.time})` : ''}</span>
+                  </span>
+                ) : (
+                  <span className="text-[10px] text-sky-400 flex items-center gap-1 font-medium bg-sky-950/40 px-1.5 py-0.5 rounded border border-sky-800/60">
+                    <Sparkles className="w-3 h-3 text-sky-400" />
+                    <span>Мгновенное автосохранение</span>
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => toggleInlineEdit(note.id)}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-xs cursor-pointer"
+                  title="Завершить быстрое редактирование"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Готово</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <input
+                type="text"
+                value={note.title}
+                onChange={(e) => handleInlineTitleChange(note, e.target.value)}
+                placeholder="Заголовок заметки..."
+                className={`w-full p-2 rounded-lg border text-xs font-bold outline-none ${theme.input} focus:border-sky-500 font-sans`}
+              />
+              <textarea
+                value={note.content}
+                onChange={(e) => handleInlineContentChange(note, e.target.value)}
+                placeholder="Текст заметки (сохраняется при каждом вводе)..."
+                rows={3}
+                className={`w-full p-2 rounded-lg border text-xs leading-relaxed outline-none ${theme.input} focus:border-sky-500 resize-y font-sans`}
+              />
+            </div>
+          </div>
+        );
+      }
+
       return (
         <div
           key={note.id}
@@ -494,7 +806,13 @@ export const NotesManagerPanel: React.FC<NotesManagerPanelProps> = ({
           <div className="flex-1 min-w-0 space-y-1">
             <div className="flex items-center gap-2">
               <span className={`w-2 h-2 rounded-full shrink-0 ${style.dotColor}`}></span>
-              <h4 className="font-bold text-xs text-slate-100 truncate">{note.title}</h4>
+              <h4 
+                onClick={() => toggleInlineEdit(note.id)}
+                className="font-bold text-xs text-slate-100 truncate cursor-pointer hover:text-sky-300 transition-colors"
+                title="Нажмите для быстрой правки с автосохранением"
+              >
+                {note.title}
+              </h4>
               <span className={`text-[10px] px-2 py-0.5 rounded font-medium ${style.badgeBg} ${style.badgeText}`}>
                 {note.category}
               </span>
@@ -504,7 +822,11 @@ export const NotesManagerPanel: React.FC<NotesManagerPanelProps> = ({
             </div>
 
             {note.content && (
-              <p className="text-[11.5px] text-slate-300 line-clamp-2 leading-relaxed">
+              <p 
+                onClick={() => toggleInlineEdit(note.id)}
+                className="text-[11.5px] text-slate-300 line-clamp-2 leading-relaxed cursor-pointer hover:text-slate-100 transition-colors"
+                title="Нажмите для быстрой правки с автосохранением"
+              >
                 {note.content}
               </p>
             )}
@@ -540,9 +862,16 @@ export const NotesManagerPanel: React.FC<NotesManagerPanelProps> = ({
               <Pin className={`w-3.5 h-3.5 ${note.isPinned ? 'fill-current text-amber-400' : ''}`} />
             </button>
             <button
+              onClick={() => toggleInlineEdit(note.id)}
+              className="p-1.5 rounded-lg bg-slate-800/80 border border-slate-700 text-slate-400 hover:text-emerald-400 transition-colors"
+              title="Быстрая правка текста на месте (автосохранение)"
+            >
+              <FileEdit className="w-3.5 h-3.5" />
+            </button>
+            <button
               onClick={() => setEditingNote(note)}
               className="p-1.5 rounded-lg bg-slate-800/80 border border-slate-700 text-slate-400 hover:text-sky-400 transition-colors"
-              title="Редактировать"
+              title="Редактировать в окне"
             >
               <Edit3 className="w-3.5 h-3.5" />
             </button>
@@ -566,65 +895,137 @@ export const NotesManagerPanel: React.FC<NotesManagerPanelProps> = ({
     return (
       <div
         key={note.id}
-        className={`rounded-xl border p-3.5 flex flex-col justify-between transition-all shadow-md group ${style.cardBg} ${style.cardBorder}`}
+        className={`rounded-xl border p-3.5 flex flex-col justify-between transition-all shadow-md group ${style.cardBg} ${style.cardBorder} ${
+          isInlineEditing ? 'ring-1 ring-sky-500/50' : ''
+        }`}
       >
         {/* Card Header */}
         <div>
           <div className="flex items-start justify-between gap-2 mb-2">
-            <div className="flex items-center gap-1.5 flex-1 min-w-0">
+            <div className="flex items-center gap-1.5 flex-1 min-w-0 flex-wrap">
               <span className={`w-2 h-2 rounded-full shrink-0 ${style.dotColor}`}></span>
               <span className={`text-[10px] px-2 py-0.5 rounded font-semibold truncate ${style.badgeBg} ${style.badgeText}`}>
                 {note.category}
               </span>
+              {/* Auto-save status in grid */}
+              {isInlineEditing && (
+                cardSaveState?.status === 'saving' ? (
+                  <span className="text-[9.5px] text-amber-300 flex items-center gap-1 font-medium bg-amber-950/60 px-1.5 py-0.5 rounded border border-amber-800/80 animate-pulse">
+                    <Clock className="w-2.5 h-2.5 text-amber-400" />
+                    <span>Сохранение...</span>
+                  </span>
+                ) : cardSaveState?.status === 'saved' || cardSaveState?.time ? (
+                  <span className="text-[9.5px] text-emerald-300 flex items-center gap-1 font-medium bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-800/80">
+                    <CheckCircle2 className="w-2.5 h-2.5 text-emerald-400" />
+                    <span>Сохранено {cardSaveState?.time ? `(${cardSaveState.time})` : ''}</span>
+                  </span>
+                ) : (
+                  <span className="text-[9.5px] text-sky-400 flex items-center gap-1 font-medium bg-sky-950/40 px-1.5 py-0.5 rounded border border-sky-800/60">
+                    <Sparkles className="w-2.5 h-2.5 text-sky-400" />
+                    <span>Автосохранение</span>
+                  </span>
+                )
+              )}
             </div>
 
             <div className="flex items-center gap-1 shrink-0">
-              <button
-                type="button"
-                onClick={() => handleTogglePin(note)}
-                className={`p-1 rounded transition-colors ${
-                  note.isPinned
-                    ? 'text-amber-400'
-                    : 'text-slate-500 hover:text-slate-300 opacity-60 group-hover:opacity-100'
-                }`}
-                title={note.isPinned ? 'Открепить' : 'Закрепить'}
-              >
-                <Pin className={`w-3.5 h-3.5 ${note.isPinned ? 'fill-current' : ''}`} />
-              </button>
+              {isInlineEditing ? (
+                <button
+                  type="button"
+                  onClick={() => toggleInlineEdit(note.id)}
+                  className="flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] shadow-xs cursor-pointer"
+                  title="Завершить правку"
+                >
+                  <Check className="w-3 h-3" />
+                  <span>Готово</span>
+                </button>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => handleTogglePin(note)}
+                    className={`p-1 rounded transition-colors ${
+                      note.isPinned
+                        ? 'text-amber-400'
+                        : 'text-slate-500 hover:text-slate-300 opacity-60 group-hover:opacity-100'
+                    }`}
+                    title={note.isPinned ? 'Открепить' : 'Закрепить'}
+                  >
+                    <Pin className={`w-3.5 h-3.5 ${note.isPinned ? 'fill-current' : ''}`} />
+                  </button>
 
-              <button
-                type="button"
-                onClick={() => setEditingNote(note)}
-                className="p-1 text-slate-500 hover:text-sky-300 rounded opacity-60 group-hover:opacity-100 transition-opacity"
-                title="Редактировать"
-              >
-                <Edit3 className="w-3.5 h-3.5" />
-              </button>
+                  <button
+                    type="button"
+                    onClick={() => toggleInlineEdit(note.id)}
+                    className="p-1 text-slate-500 hover:text-emerald-300 rounded opacity-60 group-hover:opacity-100 transition-opacity"
+                    title="Быстрая правка текста на месте (автосохранение)"
+                  >
+                    <FileEdit className="w-3.5 h-3.5" />
+                  </button>
 
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setNoteToDelete(note);
-                }}
-                className="p-1 text-slate-500 hover:text-rose-400 rounded opacity-60 group-hover:opacity-100 transition-opacity cursor-pointer"
-                title="Удалить"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingNote(note)}
+                    className="p-1 text-slate-500 hover:text-sky-300 rounded opacity-60 group-hover:opacity-100 transition-opacity"
+                    title="Редактировать в окне"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setNoteToDelete(note);
+                    }}
+                    className="p-1 text-slate-500 hover:text-rose-400 rounded opacity-60 group-hover:opacity-100 transition-opacity cursor-pointer"
+                    title="Удалить"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </>
+              )}
             </div>
           </div>
 
-          {/* Title */}
-          <h4 className="font-bold text-xs text-slate-100 mb-1.5 leading-snug">
-            {note.title}
-          </h4>
+          {/* Title - Static or Editable */}
+          {isInlineEditing ? (
+            <input
+              type="text"
+              value={note.title}
+              onChange={(e) => handleInlineTitleChange(note, e.target.value)}
+              placeholder="Заголовок заметки..."
+              className={`w-full p-1.5 mb-2 rounded border text-xs font-bold outline-none ${theme.input} focus:border-sky-500 font-sans`}
+            />
+          ) : (
+            <h4 
+              onClick={() => toggleInlineEdit(note.id)}
+              className="font-bold text-xs text-slate-100 mb-1.5 leading-snug cursor-pointer hover:text-sky-300 transition-colors"
+              title="Нажмите для быстрой правки с автосохранением"
+            >
+              {note.title}
+            </h4>
+          )}
 
-          {/* Text Content */}
-          {note.content && (
-            <p className="text-[11.5px] text-slate-300 whitespace-pre-wrap leading-relaxed mb-3 line-clamp-6">
-              {note.content}
-            </p>
+          {/* Text Content - Static or Editable */}
+          {isInlineEditing ? (
+            <textarea
+              value={note.content}
+              onChange={(e) => handleInlineContentChange(note, e.target.value)}
+              placeholder="Текст заметки (сохраняется при вводе)..."
+              rows={4}
+              className={`w-full p-2 mb-3 rounded border text-xs leading-relaxed outline-none ${theme.input} focus:border-sky-500 resize-y font-sans`}
+            />
+          ) : (
+            note.content && (
+              <p 
+                onClick={() => toggleInlineEdit(note.id)}
+                className="text-[11.5px] text-slate-300 whitespace-pre-wrap leading-relaxed mb-3 line-clamp-6 cursor-pointer hover:text-slate-100 transition-colors"
+                title="Нажмите для быстрой правки с автосохранением"
+              >
+                {note.content}
+              </p>
+            )
           )}
 
           {/* Checklist Items if present */}

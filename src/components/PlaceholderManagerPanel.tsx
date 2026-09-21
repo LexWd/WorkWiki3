@@ -78,7 +78,7 @@ export const PlaceholderManagerPanel: React.FC<PlaceholderManagerPanelProps> = (
     setFormDesc('');
     setFormType('choice');
     setFormOptions(['Вариант 1', 'Вариант 2']);
-    setFormDefaultVal('Вариант 1');
+    setFormDefaultVal('');
     setFormBinding('');
     setFormError(null);
   };
@@ -121,7 +121,7 @@ export const PlaceholderManagerPanel: React.FC<PlaceholderManagerPanelProps> = (
       description: formDesc.trim(),
       type: formType,
       options: formType === 'choice' ? formOptions : undefined,
-      defaultValue: formDefaultVal.trim() || (formType === 'choice' ? formOptions[0] || '' : ''),
+      defaultValue: formDefaultVal.trim(),
       excelColumnBinding: formBinding || undefined,
     };
 
@@ -249,7 +249,12 @@ export const PlaceholderManagerPanel: React.FC<PlaceholderManagerPanelProps> = (
                 {/* Binding and default info */}
                 <div className="mt-2 pt-1.5 flex items-center justify-between text-[10.5px] text-slate-400">
                   <div className="truncate">
-                    По умолч.: <strong className="text-slate-200">{p.defaultValue || '—'}</strong>
+                    По умолч.:{' '}
+                    {p.defaultValue ? (
+                      <strong className="text-slate-200 font-mono">{p.defaultValue}</strong>
+                    ) : (
+                      <span className="text-amber-400/90 font-medium italic font-mono">(пусто)</span>
+                    )}
                   </div>
                   {p.excelColumnBinding && (
                     <div className="flex items-center gap-1 text-emerald-400 shrink-0">
@@ -396,6 +401,23 @@ export const PlaceholderManagerPanel: React.FC<PlaceholderManagerPanelProps> = (
                   </div>
 
                   <div className="space-y-1 max-h-36 overflow-y-auto">
+                    {/* Explicit empty default option for choice */}
+                    <div className="flex items-center justify-between p-1.5 rounded bg-slate-900/60 border border-slate-800 text-xs">
+                      <span className="text-slate-400 italic">Без предвыбора (пустое по умолчанию)</span>
+                      <button
+                        type="button"
+                        onClick={() => setFormDefaultVal('')}
+                        className={`px-2 py-0.5 rounded text-[10px] transition-colors ${
+                          formDefaultVal === ''
+                            ? 'bg-emerald-600 text-white font-bold ring-1 ring-emerald-400'
+                            : 'text-slate-400 hover:text-slate-200 bg-slate-800'
+                        }`}
+                        title="Оставить значение пустым до выбора оператором"
+                      >
+                        {formDefaultVal === '' ? 'По умолч. (пусто) ✓' : 'Сделать пустым'}
+                      </button>
+                    </div>
+
                     {formOptions.map((opt) => (
                       <div
                         key={opt}
@@ -405,13 +427,13 @@ export const PlaceholderManagerPanel: React.FC<PlaceholderManagerPanelProps> = (
                         <div className="flex items-center gap-1 shrink-0">
                           <button
                             type="button"
-                            onClick={() => setFormDefaultVal(opt)}
+                            onClick={() => setFormDefaultVal(formDefaultVal === opt ? '' : opt)}
                             className={`px-1.5 py-0.5 rounded text-[10px] ${
                               formDefaultVal === opt
                                 ? 'bg-emerald-600 text-white font-bold'
                                 : 'text-slate-400 hover:text-slate-200'
                             }`}
-                            title="Сделать значением по умолчанию"
+                            title="Сделать значением по умолчанию (или кликните снова, чтобы сделать пустым)"
                           >
                             {formDefaultVal === opt ? 'По умолч. ✓' : 'Выбрать'}
                           </button>
@@ -432,16 +454,32 @@ export const PlaceholderManagerPanel: React.FC<PlaceholderManagerPanelProps> = (
               {/* Default Value for text type */}
               {formType === 'text' && (
                 <div>
-                  <label className="block text-[11px] font-medium text-slate-300 mb-1">
-                    Значение по умолчанию
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[11px] font-medium text-slate-300">
+                      Значение по умолчанию
+                    </label>
+                    {formDefaultVal !== '' && (
+                      <button
+                        type="button"
+                        onClick={() => setFormDefaultVal('')}
+                        className="text-[10px] text-amber-400 hover:text-amber-300 underline cursor-pointer"
+                      >
+                        Сделать пустым
+                      </button>
+                    )}
+                  </div>
                   <input
                     type="text"
                     value={formDefaultVal}
                     onChange={(e) => setFormDefaultVal(e.target.value)}
-                    placeholder="Например: ORD-78192"
+                    placeholder="Оставьте пустым для пустого значения по умолчанию"
                     className={`w-full p-1.5 rounded border text-xs outline-none ${theme.input}`}
                   />
+                  <span className="text-[10px] text-slate-500 mt-1 block">
+                    {formDefaultVal.trim() === ''
+                      ? '✓ Пустое значение: шаблон будет ждать ввода от оператора или останется пустым.'
+                      : 'Это значение будет автоматически подставляться в шаблон.'}
+                  </span>
                 </div>
               )}
 

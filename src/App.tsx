@@ -30,6 +30,7 @@ import { ShortcutsCheatSheetModal } from './components/ShortcutsCheatSheetModal'
 import { ProductivityStatsBar } from './components/ProductivityStatsBar';
 import { ToastNotice, ToastItem } from './components/ToastNotice';
 import { CategoryManagerModal } from './components/CategoryManagerModal';
+import { BackupManagerModal } from './components/BackupManagerModal';
 
 export default function App() {
   // Core persistent states
@@ -72,7 +73,9 @@ export default function App() {
   const [editingSnippet, setEditingSnippet] = useState<Snippet | null | 'NEW'>(null);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [categories, setCategories] = useState<string[]>(() => storage.loadCategories());
+  const [resourceCategories, setResourceCategories] = useState<string[]>(() => storage.loadResourceCategories());
   const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
+  const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
   const [newSnippetInitialCategory, setNewSnippetInitialCategory] = useState<string | undefined>(undefined);
 
   // Theme & font helpers
@@ -263,6 +266,55 @@ export default function App() {
   const handleDeleteWidget = useCallback((id: string) => {
     setWidgets((prev) => prev.filter((w) => w.id !== id));
     showToast('Ресурс удален', 'Закладка удалена из списка');
+  }, [showToast]);
+
+  // Resource / Links categories management
+  const handleAddResourceCategory = useCallback((newCat: string) => {
+    const trimmed = newCat.trim();
+    if (!trimmed) return;
+    setResourceCategories((prev) => {
+      if (prev.some((c) => c.toLowerCase() === trimmed.toLowerCase())) return prev;
+      const updated = [...prev, trimmed];
+      storage.saveResourceCategories(updated);
+      return updated;
+    });
+    showToast('Категория добавлена', `Категория «${trimmed}» добавлена для ссылок`);
+  }, [showToast]);
+
+  const handleRenameResourceCategory = useCallback((oldName: string, newName: string) => {
+    const trimmed = newName.trim();
+    if (!trimmed || oldName === trimmed) return;
+    setResourceCategories((prev) => {
+      const updated = prev.map((c) => (c === oldName ? trimmed : c));
+      storage.saveResourceCategories(updated);
+      return updated;
+    });
+    setWidgets((prev) => {
+      const updatedWidgets = prev.map((w) => (w.category === oldName ? { ...w, category: trimmed } : w));
+      storage.saveResourceWidgets(updatedWidgets);
+      return updatedWidgets;
+    });
+    showToast('Категория переименована', `«${oldName}» → «${trimmed}»`);
+  }, [showToast]);
+
+  const handleDeleteResourceCategory = useCallback((catName: string, reassignTo: string = 'Утилиты') => {
+    setResourceCategories((prev) => {
+      const updated = prev.filter((c) => c !== catName);
+      storage.saveResourceCategories(updated);
+      return updated;
+    });
+    setWidgets((prev) => {
+      const updatedWidgets = prev.map((w) => (w.category === catName ? { ...w, category: reassignTo } : w));
+      storage.saveResourceWidgets(updatedWidgets);
+      return updatedWidgets;
+    });
+    showToast('Категория удалена', `Закладки перемещены в «${reassignTo}»`);
+  }, [showToast]);
+
+  const handleResetResourceCategories = useCallback(() => {
+    const defaults = storage.resetResourceCategories();
+    setResourceCategories(defaults);
+    showToast('Категории сброшены', 'Восстановлен стандартный набор категорий ссылок');
   }, [showToast]);
 
   // Categories management
@@ -494,6 +546,8 @@ export default function App() {
         if (isPaletteOpen) setIsPaletteOpen(false);
         if (isSettingsOpen) setIsSettingsOpen(false);
         if (isShortcutsOpen) setIsShortcutsOpen(false);
+        if (isBackupModalOpen) setIsBackupModalOpen(false);
+        if (isCategoryManagerOpen) setIsCategoryManagerOpen(false);
         if (editingSnippet) setEditingSnippet(null);
         return;
       }
@@ -589,6 +643,7 @@ export default function App() {
       setPlaceholders(storage.loadPlaceholders());
       setTables(storage.loadExcelTables());
       setWidgets(storage.loadResourceWidgets());
+      setResourceCategories(storage.loadResourceCategories());
       setNotes(storage.loadNotes());
       setSettings(storage.loadSettings());
       showToast('Резервная копия загружена', 'Все шаблоны, таблицы, заметки и настройки успешно обновлены.');
@@ -603,11 +658,27 @@ export default function App() {
     setPlaceholders(storage.loadPlaceholders());
     setTables(storage.loadExcelTables());
     setWidgets(storage.loadResourceWidgets());
+    setResourceCategories(storage.resetResourceCategories());
     setNotes(storage.loadNotes());
     setSettings(storage.loadSettings());
     setMetrics(storage.loadMetrics());
     setActiveRow(storage.loadExcelTables()[0]?.rows[0] || null);
     showToast('Сброс завершен', 'Восстановлены стандартные шаблоны, Excel-база и заметки.');
+  };
+
+  const handleDataRestored = () => {
+    setSnippets(storage.loadSnippets());
+    setCategories(storage.loadCategories());
+    setPlaceholders(storage.loadPlaceholders());
+    setTables(storage.loadExcelTables());
+    setWidgets(storage.loadResourceWidgets());
+    setResourceCategories(storage.loadResourceCategories());
+    setNotes(storage.loadNotes());
+    setSettings(storage.loadSettings());
+    setMetrics(storage.loadMetrics());
+    const reloadedTables = storage.loadExcelTables();
+    setActiveRow(reloadedTables[0]?.rows[0] || null);
+    showToast('Резервная копия', 'База данных и настройки успешно обновлены!');
   };
 
   // Total rows count across all tables
@@ -637,6 +708,7 @@ export default function App() {
         }}
         onOpenShortcuts={() => setIsShortcutsOpen(true)}
         onOpenPalette={() => setIsPaletteOpen(true)}
+        onOpenBackupModal={() => setIsBackupModalOpen(true)}
         isMiniMode={settings.windowMode === 'mini-bar'}
         onToggleMiniMode={() =>
           setSettings((prev) => ({
@@ -778,6 +850,11 @@ export default function App() {
                 onAddWidget={handleAddWidget}
                 onUpdateWidget={handleUpdateWidget}
                 onDeleteWidget={handleDeleteWidget}
+                categories={resourceCategories}
+                onAddCategory={handleAddResourceCategory}
+                onRenameCategory={handleRenameResourceCategory}
+                onDeleteCategory={handleDeleteResourceCategory}
+                onResetCategories={handleResetResourceCategories}
                 settings={settings}
               />
             </div>
@@ -876,6 +953,22 @@ export default function App() {
         onRenameCategory={handleRenameCategory}
         onResetCategories={handleResetCategories}
         settings={settings}
+      />
+
+      {/* 6. Full One-Click Backup & Restore Manager Modal */}
+      <BackupManagerModal
+        isOpen={isBackupModalOpen}
+        onClose={() => setIsBackupModalOpen(false)}
+        snippets={snippets}
+        categories={categories}
+        placeholders={placeholders}
+        tables={tables}
+        widgets={widgets}
+        resourceCategories={resourceCategories}
+        notes={notes}
+        settings={settings}
+        metrics={metrics}
+        onDataRestored={handleDataRestored}
       />
     </div>
   );

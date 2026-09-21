@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, 
   Check, 
@@ -8,10 +8,15 @@ import {
   Tag, 
   Folder, 
   ListChecks, 
-  FileText 
+  FileText,
+  Clock,
+  CheckCircle2,
+  Sparkles,
+  RotateCcw
 } from 'lucide-react';
 import { NoteCard, NoteCardColor, NoteChecklistItem, GuiSettings } from '../types';
 import { getThemeClasses, getAccentClasses } from '../utils/theme';
+import { storage } from '../utils/storage';
 
 interface NoteEditorModalProps {
   isOpen: boolean;
@@ -51,10 +56,18 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
   const [checklist, setChecklist] = useState<NoteChecklistItem[]>([]);
   const [newChecklistText, setNewChecklistText] = useState('');
 
+  // Auto-save state
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
+  const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
+  const isLoadedRef = useRef(false);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   const theme = getThemeClasses(settings.theme);
   const accent = getAccentClasses(settings.accentColor);
 
   useEffect(() => {
+    isLoadedRef.current = false;
     if (note) {
       setTitle(note.title);
       setContent(note.content);
@@ -63,20 +76,105 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
       setIsPinned(Boolean(note.isPinned));
       setTags(note.tags || []);
       setChecklist(note.checklist ? [...note.checklist] : []);
+      setHasRestoredDraft(false);
     } else {
-      setTitle('');
-      setContent('');
-      setCategory(availableCategories[0] || 'Текущая смена');
-      setColor('amber');
-      setIsPinned(false);
-      setTags([]);
-      setChecklist([]);
+      const draft = storage.loadNoteDraft();
+      if (draft && (draft.title || draft.content || (draft.checklist && draft.checklist.length > 0))) {
+        setTitle(draft.title || '');
+        setContent(draft.content || '');
+        setCategory(draft.category || availableCategories[0] || 'Текущая смена');
+        setColor(draft.color || 'amber');
+        setIsPinned(Boolean(draft.isPinned));
+        setTags(draft.tags || []);
+        setChecklist(draft.checklist ? [...draft.checklist] : []);
+        setHasRestoredDraft(true);
+      } else {
+        setTitle('');
+        setContent('');
+        setCategory(availableCategories[0] || 'Текущая смена');
+        setColor('amber');
+        setIsPinned(false);
+        setTags([]);
+        setChecklist([]);
+        setHasRestoredDraft(false);
+      }
     }
     setTagInput('');
     setNewChecklistText('');
+    setSaveStatus('idle');
+    setLastSavedTime(null);
+
+    const timer = setTimeout(() => {
+      isLoadedRef.current = true;
+    }, 100);
+    return () => clearTimeout(timer);
   }, [note, isOpen]);
 
+  // Real-time Auto-Save Effect upon text editing
+  useEffect(() => {
+    if (!isLoadedRef.current || !isOpen) return;
+
+    setSaveStatus('saving');
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+
+    debounceTimerRef.current = setTimeout(() => {
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+      if (note) {
+        // Automatically save existing note into storage via onSave callback
+        const updated: NoteCard = {
+          ...note,
+          title: title.trim() || 'Без названия',
+          content,
+          category: category.trim() || 'Текущая смена',
+          color,
+          isPinned,
+          tags,
+          checklist: checklist.length > 0 ? checklist : undefined,
+          updatedAt: Date.now(),
+        };
+        onSave(updated);
+        setSaveStatus('saved');
+        setLastSavedTime(timeStr);
+      } else {
+        // Automatically save new note draft into local storage
+        if (title.trim() || content.trim() || checklist.length > 0) {
+          storage.saveNoteDraft({
+            title,
+            content,
+            category,
+            color,
+            isPinned,
+            tags,
+            checklist,
+          });
+          setSaveStatus('saved');
+          setLastSavedTime(timeStr);
+        } else {
+          storage.clearNoteDraft();
+          setSaveStatus('idle');
+        }
+      }
+    }, 280);
+
+    return () => {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    };
+  }, [title, content, category, color, isPinned, tags, checklist, note, isOpen]);
+
   if (!isOpen) return null;
+
+  const handleClearDraft = () => {
+    storage.clearNoteDraft();
+    setTitle('');
+    setContent('');
+    setTags([]);
+    setChecklist([]);
+    setHasRestoredDraft(false);
+    setSaveStatus('idle');
+    setLastSavedTime(null);
+  };
 
   const handleAddTag = () => {
     const trimmed = tagInput.trim().toLowerCase().replace(/^#/, '');
@@ -131,6 +229,9 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
       updatedAt: Date.now(),
     };
 
+    if (!note) {
+      storage.clearNoteDraft();
+    }
     onSave(savedNote);
     onClose();
   };
@@ -138,28 +239,67 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
       <div className={`w-full max-w-2xl rounded-xl border shadow-2xl overflow-hidden flex flex-col max-h-[92vh] ${theme.panel} ${theme.border}`}>
-        {/* Header */}
-        <div className={`p-3.5 border-b flex items-center justify-between ${theme.panelHeader} ${theme.border}`}>
-          <div className="flex items-center gap-2">
-            <div className={`w-6 h-6 rounded flex items-center justify-center font-bold text-xs ${accent.primary}`}>
+        {/* Header with Auto-Save Badge */}
+        <div className={`p-3.5 border-b flex items-center justify-between gap-3 ${theme.panelHeader} ${theme.border}`}>
+          <div className="flex items-center gap-2 min-w-0">
+            <div className={`w-6 h-6 rounded flex items-center justify-center font-bold text-xs shrink-0 ${accent.primary}`}>
               <FileText className="w-3.5 h-3.5" />
             </div>
-            <div>
-              <h2 className="font-bold text-sm text-slate-100">
+            <div className="min-w-0">
+              <h2 className="font-bold text-sm text-slate-100 truncate">
                 {note ? 'Редактирование карточки-заметки' : 'Новая карточка-заметка'}
               </h2>
-              <p className="text-[11px] text-slate-400">
-                Создание памятки, чек-листа или черновика для текущей смены
+              <p className="text-[11px] text-slate-400 truncate">
+                Памятка, чек-лист или черновик для текущей смены
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1 rounded text-slate-400 hover:text-slate-200"
-          >
-            <X className="w-4 h-4" />
-          </button>
+
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Live Auto-Save Status Indicator */}
+            {saveStatus === 'saving' ? (
+              <span className="text-[10px] text-amber-300 flex items-center gap-1 font-medium bg-amber-950/60 px-2 py-0.5 rounded border border-amber-800/80 animate-pulse">
+                <Clock className="w-3 h-3 text-amber-400 shrink-0" />
+                <span>Автосохранение...</span>
+              </span>
+            ) : saveStatus === 'saved' || lastSavedTime ? (
+              <span className="text-[10px] text-emerald-300 flex items-center gap-1 font-medium bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/80">
+                <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
+                <span>{note ? 'Сохранено в хранилище' : 'Черновик сохранён'} {lastSavedTime ? `(${lastSavedTime})` : ''}</span>
+              </span>
+            ) : (
+              <span className="text-[10px] text-slate-400 flex items-center gap-1 font-medium">
+                <Sparkles className="w-3 h-3 text-sky-400 shrink-0" />
+                <span>Автосохранение активно</span>
+              </span>
+            )}
+
+            <button
+              onClick={onClose}
+              className="p-1 rounded text-slate-400 hover:text-slate-200 transition-colors"
+              title="Закрыть (все изменения уже сохранены)"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
+
+        {/* Restored draft notice */}
+        {hasRestoredDraft && !note && (
+          <div className="px-4 py-2 bg-sky-950/50 border-b border-sky-800/60 flex items-center justify-between text-xs text-sky-200">
+            <span className="flex items-center gap-1.5 text-[11px]">
+              <Sparkles className="w-3.5 h-3.5 text-sky-400" />
+              Восстановлен несохранённый черновик из локального хранилища
+            </span>
+            <button
+              type="button"
+              onClick={handleClearDraft}
+              className="text-[10.5px] text-sky-300 hover:text-rose-300 underline cursor-pointer"
+            >
+              Сбросить черновик
+            </button>
+          </div>
+        )}
 
         {/* Body */}
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 space-y-4 text-xs">

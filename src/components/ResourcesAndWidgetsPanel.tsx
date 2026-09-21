@@ -29,29 +29,28 @@ import {
   Square,
   Sliders,
   Maximize2,
-  AlertCircle
+  AlertCircle,
+  FolderCog,
 } from 'lucide-react';
 import { ResourceWidget, WidgetType, WidgetIconType, GuiSettings } from '../types';
 import { getThemeClasses, getAccentClasses } from '../utils/theme';
 import { soundService } from '../utils/sound';
 import { ConfirmDialogModal } from './ConfirmDialogModal';
+import { DEFAULT_RESOURCE_CATEGORIES } from '../data/defaultData';
+import { ResourceCategoryManagerModal } from './ResourceCategoryManagerModal';
 
 interface ResourcesAndWidgetsPanelProps {
   widgets: ResourceWidget[];
   onAddWidget: (widget: ResourceWidget) => void;
   onUpdateWidget: (widget: ResourceWidget) => void;
   onDeleteWidget: (id: string) => void;
+  categories?: string[];
+  onAddCategory?: (category: string) => void;
+  onRenameCategory?: (oldName: string, newName: string) => void;
+  onDeleteCategory?: (category: string, reassignTo?: string) => void;
+  onResetCategories?: () => void;
   settings: GuiSettings;
 }
-
-const CATEGORIES = [
-  'Все',
-  'Логистика и трекинг',
-  'Карты и гео',
-  'Базы знаний',
-  'CRM и системы',
-  'Утилиты'
-];
 
 const AVAILABLE_ICONS: { id: WidgetIconType; label: string }[] = [
   { id: 'truck', label: 'Доставка' },
@@ -82,12 +81,29 @@ export const ResourcesAndWidgetsPanel: React.FC<ResourcesAndWidgetsPanelProps> =
   onAddWidget,
   onUpdateWidget,
   onDeleteWidget,
+  categories,
+  onAddCategory,
+  onRenameCategory,
+  onDeleteCategory,
+  onResetCategories,
   settings,
 }) => {
   const [selectedCategory, setSelectedCategory] = useState('Все');
   const [searchQuery, setSearchQuery] = useState('');
   const [viewFilter, setViewFilter] = useState<'all' | 'links' | 'iframes'>('all');
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
+  
+  // Category management modal
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [isCreatingNewCategoryInModal, setIsCreatingNewCategoryInModal] = useState(false);
+  const [customCategoryInput, setCustomCategoryInput] = useState('');
+
+  // Active categories list
+  const activeCategories = useMemo(() => {
+    const base = categories && categories.length > 0 ? categories : DEFAULT_RESOURCE_CATEGORIES;
+    const widgetCats = widgets.map((w) => w.category).filter(Boolean);
+    return Array.from(new Set([...base, ...widgetCats]));
+  }, [categories, widgets]);
   
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -202,7 +218,9 @@ export const ResourcesAndWidgetsPanel: React.FC<ResourcesAndWidgetsPanelProps> =
     setFormTitle('');
     setFormUrl('https://');
     setFormType(defaultType);
-    setFormCategory(selectedCategory === 'Все' ? 'Логистика и трекинг' : selectedCategory);
+    setFormCategory(selectedCategory === 'Все' ? (activeCategories[0] || 'Логистика и трекинг') : selectedCategory);
+    setIsCreatingNewCategoryInModal(false);
+    setCustomCategoryInput('');
     setFormDescription('');
     setFormTags('');
     setFormIcon(defaultType === 'iframe' ? 'map-pin' : 'truck');
@@ -222,6 +240,8 @@ export const ResourcesAndWidgetsPanel: React.FC<ResourcesAndWidgetsPanelProps> =
     setFormUrl(widget.url);
     setFormType(widget.type);
     setFormCategory(widget.category);
+    setIsCreatingNewCategoryInModal(false);
+    setCustomCategoryInput('');
     setFormDescription(widget.description || '');
     setFormTags(widget.tags.join(', '));
     setFormIcon(widget.icon || 'globe');
@@ -250,13 +270,26 @@ export const ResourcesAndWidgetsPanel: React.FC<ResourcesAndWidgetsPanelProps> =
       .map((t) => t.trim().toLowerCase())
       .filter((t) => t.length > 0);
 
+    let finalCategory = formCategory;
+    if (isCreatingNewCategoryInModal) {
+      const trimmed = customCategoryInput.trim();
+      if (!trimmed) {
+        setModalError('Пожалуйста, введите название новой категории');
+        return;
+      }
+      finalCategory = trimmed;
+      if (onAddCategory) {
+        onAddCategory(trimmed);
+      }
+    }
+
     if (editingWidget) {
       const updated: ResourceWidget = {
         ...editingWidget,
         title: formTitle.trim(),
         url: cleanUrl,
         type: formType,
-        category: formCategory,
+        category: finalCategory,
         description: formDescription.trim(),
         tags,
         icon: formIcon,
@@ -272,7 +305,7 @@ export const ResourcesAndWidgetsPanel: React.FC<ResourcesAndWidgetsPanelProps> =
         title: formTitle.trim(),
         url: cleanUrl,
         type: formType,
-        category: formCategory,
+        category: finalCategory,
         description: formDescription.trim(),
         tags,
         icon: formIcon,
@@ -428,19 +461,45 @@ export const ResourcesAndWidgetsPanel: React.FC<ResourcesAndWidgetsPanelProps> =
         <span className="text-[10px] uppercase font-bold text-slate-400 mr-1 shrink-0">
           Категории:
         </span>
-        {CATEGORIES.map((cat) => (
-          <button
-            key={cat}
-            onClick={() => setSelectedCategory(cat)}
-            className={`px-2.5 py-0.5 rounded-full text-xs transition-colors shrink-0 font-medium ${
-              selectedCategory === cat
-                ? `${accent.primaryMuted} font-bold ring-1 ring-sky-400/50 text-slate-100`
-                : 'bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-slate-200 border border-slate-700/50'
-            }`}
-          >
-            {cat}
-          </button>
-        ))}
+        <button
+          onClick={() => setSelectedCategory('Все')}
+          className={`px-2.5 py-0.5 rounded-full text-xs transition-colors shrink-0 font-medium ${
+            selectedCategory === 'Все'
+              ? `${accent.primaryMuted} font-bold ring-1 ring-sky-400/50 text-slate-100`
+              : 'bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-slate-200 border border-slate-700/50'
+          }`}
+        >
+          Все ({widgets.length})
+        </button>
+
+        {activeCategories.map((cat) => {
+          const count = widgets.filter((w) => w.category === cat).length;
+          return (
+            <button
+              key={cat}
+              onClick={() => setSelectedCategory(cat)}
+              className={`px-2.5 py-0.5 rounded-full text-xs transition-colors shrink-0 font-medium flex items-center gap-1.5 ${
+                selectedCategory === cat
+                  ? `${accent.primaryMuted} font-bold ring-1 ring-sky-400/50 text-slate-100`
+                  : 'bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-slate-200 border border-slate-700/50'
+              }`}
+            >
+              <span>{cat}</span>
+              <span className="text-[10px] opacity-70 font-mono">({count})</span>
+            </button>
+          );
+        })}
+
+        {/* Category Customization Manager Button */}
+        <button
+          type="button"
+          onClick={() => setIsCategoryModalOpen(true)}
+          className="ml-auto px-2.5 py-0.5 rounded-full border border-slate-700 hover:border-slate-500 bg-slate-900/80 hover:bg-slate-800 text-slate-400 hover:text-sky-300 transition-colors flex items-center gap-1.5 text-[11px] shrink-0"
+          title="Настройка категорий ссылок (добавить, переименовать, удалить)"
+        >
+          <FolderCog className="w-3.5 h-3.5 text-sky-400" />
+          <span>Настроить категории</span>
+        </button>
       </div>
 
       {/* Main Dashboard Scrollable Canvas */}
@@ -860,20 +919,44 @@ export const ResourcesAndWidgetsPanel: React.FC<ResourcesAndWidgetsPanelProps> =
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-medium text-slate-300 mb-1">
-                    Категория
-                  </label>
-                  <select
-                    value={formCategory}
-                    onChange={(e) => setFormCategory(e.target.value)}
-                    className={`w-full p-2 rounded-lg border text-xs outline-none ${theme.input}`}
-                  >
-                    <option value="Логистика и трекинг">Логистика и трекинг</option>
-                    <option value="Карты и гео">Карты и гео</option>
-                    <option value="Базы знаний">Базы знаний</option>
-                    <option value="CRM и системы">CRM и системы</option>
-                    <option value="Утилиты">Утилиты</option>
-                  </select>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[11px] font-medium text-slate-300">
+                      Категория
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCreatingNewCategoryInModal(!isCreatingNewCategoryInModal);
+                        setCustomCategoryInput('');
+                      }}
+                      className="text-[10px] text-sky-400 hover:text-sky-300 transition-colors"
+                    >
+                      {isCreatingNewCategoryInModal ? '← Выбрать из списка' : '+ Новая категория'}
+                    </button>
+                  </div>
+
+                  {isCreatingNewCategoryInModal ? (
+                    <input
+                      type="text"
+                      value={customCategoryInput}
+                      onChange={(e) => setCustomCategoryInput(e.target.value)}
+                      placeholder="Название новой категории..."
+                      className={`w-full p-2 rounded-lg border text-xs outline-none ${theme.input}`}
+                      autoFocus
+                    />
+                  ) : (
+                    <select
+                      value={formCategory}
+                      onChange={(e) => setFormCategory(e.target.value)}
+                      className={`w-full p-2 rounded-lg border text-xs outline-none ${theme.input}`}
+                    >
+                      {activeCategories.map((cat) => (
+                        <option key={cat} value={cat}>
+                          {cat}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
               </div>
 
@@ -1069,6 +1152,19 @@ export const ResourcesAndWidgetsPanel: React.FC<ResourcesAndWidgetsPanelProps> =
           }
         }}
         onCancel={() => setWidgetToDelete(null)}
+      />
+
+      {/* Modal: Category Customization Manager */}
+      <ResourceCategoryManagerModal
+        isOpen={isCategoryModalOpen}
+        onClose={() => setIsCategoryModalOpen(false)}
+        categories={activeCategories}
+        widgets={widgets}
+        onAddCategory={(cat) => onAddCategory?.(cat)}
+        onRenameCategory={(oldN, newN) => onRenameCategory?.(oldN, newN)}
+        onDeleteCategory={(cat, reassign) => onDeleteCategory?.(cat, reassign)}
+        onResetCategories={() => onResetCategories?.()}
+        settings={settings}
       />
     </div>
   );

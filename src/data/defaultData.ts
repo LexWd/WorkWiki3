@@ -130,6 +130,24 @@ export const DEFAULT_PLACEHOLDERS: PlaceholderConfig[] = [
     defaultValue: 'Москва',
     excelColumnBinding: 'Город',
   },
+  {
+    id: 'ph-11',
+    key: 'пол',
+    label: 'Пол клиента',
+    description: 'Используется для условного обращения (уважаемый / уважаемая)',
+    type: 'choice',
+    options: ['м', 'ж'],
+    defaultValue: 'м',
+  },
+  {
+    id: 'ph-12',
+    key: 'тип_доставки',
+    label: 'Тип доставки',
+    description: 'Способ вручения (курьер, пвз, почта)',
+    type: 'choice',
+    options: ['курьер', 'пвз', 'почта'],
+    defaultValue: 'курьер',
+  },
 ];
 
 export const DEFAULT_EXCEL_TABLES: ExcelTable[] = [
@@ -259,6 +277,18 @@ export const DEFAULT_EXCEL_TABLES: ExcelTable[] = [
 ];
 
 export const DEFAULT_SNIPPETS: Snippet[] = [
+  {
+    id: 'snip-ru-logic',
+    title: 'Умный статус с условными блоками (Logic Blocks)',
+    shortcut: '/логика',
+    category: 'Заказы и доставка',
+    content: 'Здравствуйте, {{?пол=м:уважаемый|уважаемая}} {{имя_клиента}}!\n\nПо вашему заказу №{{номер_заказа}} статус: «{{статус_заказа}}».\n{{?трек_номер:Трек-номер для отслеживания: {{трек_номер}} (служба «{{служба_доставки}}»).|Трек-номер формируется и поступит вам в течение 2 часов.}}\n\n{{?тип_доставки=курьер:Курьер свяжется с вами за 1 час до доставки в г. {{город_доставки}}.|Заказ ожидает вас в пункте самовывоза г. {{город_доставки}}.}}\n\nХорошего вам дня!',
+    tags: ['логика', 'условия', 'пол', 'трек', 'доставка'],
+    hotkey: 'Alt+0',
+    isPinned: true,
+    usageCount: 95,
+    updatedAt: Date.now() - 1000 * 1800,
+  },
   {
     id: 'snip-ru-1',
     title: 'Приветствие и начало диалога',
@@ -554,5 +584,14 @@ export const DEFAULT_NOTE_CARDS: NoteCard[] = [
     updatedAt: Date.now() - 1000 * 3600 * 3,
   },
 ];
+
+export const DEFAULT_RESOURCE_CATEGORIES: string[] = [
+  'Логистика и трекинг',
+  'Карты и гео',
+  'Базы знаний',
+  'CRM и системы',
+  'Утилиты',
+];
+
 
 
