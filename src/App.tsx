@@ -9,7 +9,8 @@ import {
   ActiveTab,
   ResourceWidget,
   ImportSnippetMode,
-  NoteCard
+  NoteCard,
+  CategoryMetadata
 } from './types';
 import { storage } from './utils/storage';
 import { soundService } from './utils/sound';
@@ -73,6 +74,7 @@ export default function App() {
   const [editingSnippet, setEditingSnippet] = useState<Snippet | null | 'NEW'>(null);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [categories, setCategories] = useState<string[]>(() => storage.loadCategories());
+  const [categoryMetadata, setCategoryMetadata] = useState<Record<string, CategoryMetadata>>(() => storage.loadCategoryMetadata());
   const [resourceCategories, setResourceCategories] = useState<string[]>(() => storage.loadResourceCategories());
   const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
   const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
@@ -114,6 +116,10 @@ export default function App() {
   useEffect(() => {
     storage.saveCategories(categories);
   }, [categories]);
+
+  useEffect(() => {
+    storage.saveCategoryMetadata(categoryMetadata);
+  }, [categoryMetadata]);
 
   // Apply density and font-size to document root so all components scale dynamically
   useEffect(() => {
@@ -336,6 +342,13 @@ export default function App() {
       storage.saveCategories(updated);
       return updated;
     });
+    setCategoryMetadata((prev) => {
+      if (!prev[catToDelete]) return prev;
+      const updated = { ...prev };
+      delete updated[catToDelete];
+      storage.saveCategoryMetadata(updated);
+      return updated;
+    });
     // Reassign snippets that belonged to deleted category
     setSnippets((prev) =>
       prev.map((s) => (s.category === catToDelete ? { ...s, category: reassignTo } : s))
@@ -351,15 +364,35 @@ export default function App() {
       storage.saveCategories(updated);
       return updated;
     });
+    setCategoryMetadata((prev) => {
+      if (!prev[oldName]) return prev;
+      const updated = { ...prev, [trimmed]: prev[oldName] };
+      delete updated[oldName];
+      storage.saveCategoryMetadata(updated);
+      return updated;
+    });
     setSnippets((prev) =>
       prev.map((s) => (s.category === oldName ? { ...s, category: trimmed } : s))
     );
     showToast('Категория переименована', `«${oldName}» → «${trimmed}»`);
   }, [showToast]);
 
+  const handleUpdateCategoryMetadata = useCallback((categoryName: string, meta: Partial<CategoryMetadata>) => {
+    setCategoryMetadata((prev) => {
+      const existing = prev[categoryName] || { color: 'sky' };
+      const updated = {
+        ...prev,
+        [categoryName]: { ...existing, ...meta },
+      };
+      storage.saveCategoryMetadata(updated);
+      return updated;
+    });
+  }, []);
+
   const handleResetCategories = useCallback(() => {
     const defaults = storage.resetCategories();
     setCategories(defaults);
+    setCategoryMetadata(storage.loadCategoryMetadata());
     showToast('Категории сброшены', 'Восстановлен стандартный набор категорий');
   }, [showToast]);
 
@@ -645,6 +678,7 @@ export default function App() {
       setWidgets(storage.loadResourceWidgets());
       setResourceCategories(storage.loadResourceCategories());
       setNotes(storage.loadNotes());
+      setCategoryMetadata(storage.loadCategoryMetadata());
       setSettings(storage.loadSettings());
       showToast('Резервная копия загружена', 'Все шаблоны, таблицы, заметки и настройки успешно обновлены.');
     } else {
@@ -660,6 +694,7 @@ export default function App() {
     setWidgets(storage.loadResourceWidgets());
     setResourceCategories(storage.resetResourceCategories());
     setNotes(storage.loadNotes());
+    setCategoryMetadata(storage.loadCategoryMetadata());
     setSettings(storage.loadSettings());
     setMetrics(storage.loadMetrics());
     setActiveRow(storage.loadExcelTables()[0]?.rows[0] || null);
@@ -669,6 +704,7 @@ export default function App() {
   const handleDataRestored = () => {
     setSnippets(storage.loadSnippets());
     setCategories(storage.loadCategories());
+    setCategoryMetadata(storage.loadCategoryMetadata());
     setPlaceholders(storage.loadPlaceholders());
     setTables(storage.loadExcelTables());
     setWidgets(storage.loadResourceWidgets());
@@ -771,6 +807,7 @@ export default function App() {
                     setSelectedSnippet(s);
                   }}
                   categories={categories}
+                  categoryMetadata={categoryMetadata}
                   onAddCategory={handleAddCategory}
                   onDeleteCategory={handleDeleteCategory}
                   onOpenCategoryManager={() => setIsCategoryManagerOpen(true)}
@@ -916,6 +953,7 @@ export default function App() {
         activeRow={activeRow}
         settings={settings}
         availableCategories={categories}
+        categoryMetadata={categoryMetadata}
         onAddNewCategory={handleAddCategory}
         initialCategory={newSnippetInitialCategory}
       />
@@ -952,6 +990,8 @@ export default function App() {
         onDeleteCategory={handleDeleteCategory}
         onRenameCategory={handleRenameCategory}
         onResetCategories={handleResetCategories}
+        categoryMetadata={categoryMetadata}
+        onUpdateCategoryMetadata={handleUpdateCategoryMetadata}
         settings={settings}
       />
 

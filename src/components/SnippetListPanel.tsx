@@ -1,24 +1,31 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { 
   Search, 
   Plus, 
-  Pin, 
   Star,
   Copy, 
   Check, 
-  Tag, 
-  Zap, 
   Edit3, 
   Trash2,
   FileJson,
   FolderPlus,
   FolderCog,
-  X
+  X,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  LayoutGrid,
+  Layers,
+  Folder,
+  SlidersHorizontal,
+  FolderTree
 } from 'lucide-react';
-import { Snippet, PlaceholderConfig, ExcelRow, GuiSettings } from '../types';
+import { Snippet, PlaceholderConfig, ExcelRow, GuiSettings, CategoryMetadata } from '../types';
 import { getThemeClasses, getAccentClasses, getDensityPadding } from '../utils/theme';
 import { interpolateSnippet } from '../utils/interpolator';
 import { ConfirmDialogModal } from './ConfirmDialogModal';
+import { CategoryTreeDropdown } from './CategoryTreeDropdown';
+import { getCategoryMeta, renderCategoryIcon } from '../utils/categoryMeta';
 
 interface SnippetListPanelProps {
   snippets: Snippet[];
@@ -34,6 +41,7 @@ interface SnippetListPanelProps {
   selectedSnippetId: string | null;
   onSelectSnippet: (snippet: Snippet) => void;
   categories: string[];
+  categoryMetadata?: Record<string, CategoryMetadata>;
   onAddCategory: (category: string) => void;
   onDeleteCategory: (category: string, reassignTo?: string) => void;
   onOpenCategoryManager?: () => void;
@@ -52,6 +60,7 @@ export const SnippetListPanel: React.FC<SnippetListPanelProps> = ({
   selectedSnippetId,
   onSelectSnippet,
   categories,
+  categoryMetadata,
   onAddCategory,
   onDeleteCategory,
   onOpenCategoryManager,
@@ -60,6 +69,15 @@ export const SnippetListPanel: React.FC<SnippetListPanelProps> = ({
   const [selectedCategory, setSelectedCategory] = useState('Все');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
+
+  // Category Tree / Dropdown Popover
+  const [isTreeDropdownOpen, setIsTreeDropdownOpen] = useState(false);
+
+  // Category navigation view mode: 'scroll' (horizontal bar with arrows) or 'grid' (all wrapped)
+  const [categoryViewMode, setCategoryViewMode] = useState<'scroll' | 'grid'>('scroll');
+  const categoriesScrollRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(true);
 
   // Adding category inline form
   const [isAddingCategory, setIsAddingCategory] = useState(false);
@@ -78,6 +96,36 @@ export const SnippetListPanel: React.FC<SnippetListPanelProps> = ({
   const pinnedCount = useMemo(() => {
     return snippets.filter((s) => s.isPinned).length;
   }, [snippets]);
+
+  // Check scroll position for arrow buttons
+  const checkScroll = () => {
+    if (!categoriesScrollRef.current) return;
+    const { scrollLeft, scrollWidth, clientWidth } = categoriesScrollRef.current;
+    setCanScrollLeft(scrollLeft > 5);
+    setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 5);
+  };
+
+  useEffect(() => {
+    checkScroll();
+    const el = categoriesScrollRef.current;
+    if (el) {
+      el.addEventListener('scroll', checkScroll, { passive: true });
+      window.addEventListener('resize', checkScroll);
+      return () => {
+        el.removeEventListener('scroll', checkScroll);
+        window.removeEventListener('resize', checkScroll);
+      };
+    }
+  }, [availableCategories, categoryViewMode]);
+
+  const handleScroll = (direction: 'left' | 'right') => {
+    if (!categoriesScrollRef.current) return;
+    const distance = 160;
+    categoriesScrollRef.current.scrollBy({
+      left: direction === 'left' ? -distance : distance,
+      behavior: 'smooth',
+    });
+  };
 
   // Filtered & sorted snippets
   const filteredSnippets = useMemo(() => {
@@ -134,8 +182,34 @@ export const SnippetListPanel: React.FC<SnippetListPanelProps> = ({
     return snippets.filter((s) => s.category === selectedCategory).length;
   }, [snippets, selectedCategory, pinnedCount]);
 
+  const activeCategoryMeta = useMemo(() => {
+    return getCategoryMeta(selectedCategory, categoryMetadata);
+  }, [selectedCategory, categoryMetadata]);
+
   return (
-    <div className={`flex flex-col h-full border-r ${theme.border} ${theme.panel} overflow-hidden text-xs select-none`}>
+    <div className={`relative flex flex-col h-full border-r ${theme.border} ${theme.panel} overflow-hidden text-xs select-none`}>
+      {/* Category Tree / Dropdown Popover */}
+      <CategoryTreeDropdown
+        isOpen={isTreeDropdownOpen}
+        onClose={() => setIsTreeDropdownOpen(false)}
+        categories={categories}
+        snippets={snippets}
+        selectedCategory={selectedCategory}
+        onSelectCategory={(cat) => {
+          setSelectedCategory(cat);
+          // scroll pill into view if in scroll mode
+          setTimeout(() => checkScroll(), 100);
+        }}
+        onCreateNewSnippet={(cat) => onCreateNew(cat)}
+        categoryMetadata={categoryMetadata}
+        onOpenCategoryManager={onOpenCategoryManager}
+        onStartAddCategory={() => {
+          setIsAddingCategory(true);
+          setTimeout(() => addCategoryInputRef.current?.focus(), 50);
+        }}
+        settings={settings}
+      />
+
       {/* Top Search & Filter Bar */}
       <div className={`p-2 border-b ${theme.border} ${theme.panelHeader} space-y-2 shrink-0`}>
         {/* Search Input & Action Buttons */}
@@ -162,7 +236,7 @@ export const SnippetListPanel: React.FC<SnippetListPanelProps> = ({
 
           <button
             type="button"
-            onClick={() => onCreateNew(selectedCategory !== 'Все' ? selectedCategory : undefined)}
+            onClick={() => onCreateNew(selectedCategory !== 'Все' && selectedCategory !== '⭐ Избранные' ? selectedCategory : undefined)}
             className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-opacity hover:opacity-90 shrink-0 cursor-pointer ${accent.primary}`}
             title="Создать новый шаблон (Ctrl+N)"
           >
@@ -171,154 +245,299 @@ export const SnippetListPanel: React.FC<SnippetListPanelProps> = ({
           </button>
         </div>
 
-        {/* Category Filter Pills & Add Category Button */}
-        <div className="flex items-center justify-between gap-1 overflow-x-auto pb-0.5 no-scrollbar">
-          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
-            {availableCategories.map((cat) => (
+        {/* Tree / Dropdown Trigger & View Mode Switcher Header */}
+        <div className="flex items-center justify-between gap-1.5 pt-0.5">
+          {/* Main Dropdown / Tree Selector Button */}
+          <button
+            type="button"
+            onClick={() => setIsTreeDropdownOpen(!isTreeDropdownOpen)}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer shadow-xs max-w-[240px] truncate ${
+              isTreeDropdownOpen
+                ? `${activeCategoryMeta.style.activeBg} ${activeCategoryMeta.style.activeBorder} ${activeCategoryMeta.style.activeText}`
+                : 'bg-slate-800/90 hover:bg-slate-700/90 text-slate-200 border-slate-700/70 hover:border-slate-600'
+            }`}
+            title="Открыть выпадающее древовидное меню всех коллекций с поиском"
+          >
+            <div className={`w-4 h-4 rounded flex items-center justify-center shrink-0 ${activeCategoryMeta.style.pillBg} ${activeCategoryMeta.style.pillText}`}>
+              {renderCategoryIcon(activeCategoryMeta.icon, 'w-3 h-3')}
+            </div>
+            <span className="truncate">{selectedCategory}</span>
+            <span className="text-[10px] font-mono opacity-60">({currentCategorySnippetCount})</span>
+            <ChevronDown className={`w-3.5 h-3.5 opacity-60 transition-transform ml-0.5 shrink-0 ${isTreeDropdownOpen ? 'rotate-180 text-sky-400' : ''}`} />
+          </button>
+
+          {/* Quick controls: View Mode toggle & Management */}
+          <div className="flex items-center gap-1 shrink-0">
+            {/* Toggle scroll vs wrapped grid */}
+            <button
+              type="button"
+              onClick={() => setCategoryViewMode(categoryViewMode === 'scroll' ? 'grid' : 'scroll')}
+              className={`p-1 rounded-md border transition-colors cursor-pointer ${
+                categoryViewMode === 'grid'
+                  ? 'bg-sky-500/20 text-sky-300 border-sky-400/40'
+                  : 'bg-slate-800/80 text-slate-400 hover:text-slate-200 border-slate-700/60'
+              }`}
+              title={categoryViewMode === 'scroll' ? 'Развернуть все категории сеткой (Wrap Grid)' : 'Свернуть в компактную прокручиваемую ленту'}
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+            </button>
+
+            {/* Tree Dropdown direct button */}
+            <button
+              type="button"
+              onClick={() => setIsTreeDropdownOpen(!isTreeDropdownOpen)}
+              className="p-1 rounded-md text-slate-400 hover:text-sky-300 bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/60 transition-colors cursor-pointer"
+              title="Открыть меню коллекций (Дерево папок)"
+            >
+              <FolderTree className="w-3.5 h-3.5 text-sky-400" />
+            </button>
+
+            {/* Categories manager modal */}
+            {onOpenCategoryManager && (
               <button
-                key={cat}
                 type="button"
-                onClick={() => setSelectedCategory(cat)}
-                className={`px-2 py-0.5 rounded-md text-[10.5px] font-medium transition-colors shrink-0 whitespace-nowrap cursor-pointer ${
-                  selectedCategory === cat
-                    ? `${accent.primaryMuted} font-bold ring-1 ring-sky-400/40`
-                    : 'bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 border border-slate-700/50'
-                }`}
+                onClick={onOpenCategoryManager}
+                className="p-1 rounded-md text-slate-400 hover:text-sky-300 bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/60 transition-colors cursor-pointer"
+                title="Управление категориями (цвета, иконки, переименование)"
               >
-                {cat}
+                <FolderCog className="w-3.5 h-3.5 text-purple-400" />
               </button>
-            ))}
+            )}
 
-            {/* Inline Add Category Form / Button */}
-            {isAddingCategory ? (
-              <form
-                onSubmit={handleConfirmAddCategory}
-                onClick={(e) => e.stopPropagation()}
-                onMouseDown={(e) => e.stopPropagation()}
-                className="flex items-center gap-1 shrink-0 bg-slate-900 border border-sky-500 rounded-md p-0.5 shadow-sm"
+            {/* JSON Collections in Settings */}
+            {onOpenSettings && (
+              <button
+                type="button"
+                onClick={() => onOpenSettings('collections')}
+                className="p-1 rounded-md text-slate-400 hover:text-sky-300 bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/60 transition-colors cursor-pointer"
+                title="Экспорт и импорт коллекций"
               >
-                <input
-                  ref={addCategoryInputRef}
-                  type="text"
-                  value={newCategoryName}
-                  onChange={(e) => setNewCategoryName(e.target.value)}
-                  placeholder="Новая категория..."
-                  className="px-2 py-0.5 rounded text-[11px] bg-slate-950 text-slate-100 outline-none w-36 select-text"
-                  autoFocus
-                  onClick={(e) => e.stopPropagation()}
-                  onKeyDown={(e) => {
-                    e.stopPropagation();
-                    if (e.key === 'Escape') {
-                      setIsAddingCategory(false);
-                      setNewCategoryName('');
-                    }
-                  }}
-                />
-                <button
-                  type="submit"
-                  className="px-1.5 py-0.5 rounded bg-sky-600 hover:bg-sky-500 text-white text-[10.5px] font-bold cursor-pointer"
-                  title="Добавить категорию (Enter)"
-                >
-                  <Check className="w-3 h-3" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsAddingCategory(false);
-                    setNewCategoryName('');
-                  }}
-                  className="px-1 py-0.5 rounded hover:bg-slate-800 text-slate-400 hover:text-slate-200 cursor-pointer"
-                  title="Отмена (Esc)"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </form>
-            ) : (
-              <div className="flex items-center gap-1 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsAddingCategory(true);
-                    setTimeout(() => {
-                      addCategoryInputRef.current?.focus();
-                      addCategoryInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
-                    }, 50);
-                  }}
-                  className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-medium text-sky-400 hover:text-sky-300 bg-sky-950/40 hover:bg-sky-900/50 border border-dashed border-sky-500/50 shrink-0 whitespace-nowrap transition-colors cursor-pointer"
-                  title="Добавить новую категорию вручную"
-                >
-                  <FolderPlus className="w-3 h-3" />
-                  <span>+ Категория</span>
-                </button>
+                <FileJson className="w-3.5 h-3.5 text-sky-400" />
+              </button>
+            )}
+          </div>
+        </div>
 
-                {onOpenCategoryManager && (
+        {/* Category Pills Bar: Scroll Mode with Left/Right arrows or Grid Mode */}
+        <div className="relative group/pills">
+          {categoryViewMode === 'scroll' ? (
+            <div className="flex items-center gap-1">
+              {/* Left Scroll Button */}
+              {canScrollLeft && (
+                <button
+                  type="button"
+                  onClick={() => handleScroll('left')}
+                  className="absolute left-0 z-10 p-1 bg-slate-900/90 hover:bg-slate-800 border border-slate-700 rounded-md text-slate-200 shadow-md cursor-pointer transition-all"
+                  title="Прокрутить влево"
+                >
+                  <ChevronLeft className="w-3 h-3" />
+                </button>
+              )}
+
+              {/* Scrollable container with mouse wheel support */}
+              <div 
+                ref={categoriesScrollRef}
+                onWheel={(e) => {
+                  if (e.deltaY !== 0 && categoriesScrollRef.current) {
+                    e.preventDefault();
+                    categoriesScrollRef.current.scrollLeft += e.deltaY;
+                    checkScroll();
+                  }
+                }}
+                className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5 scroll-smooth flex-1"
+              >
+                {availableCategories.map((cat) => {
+                  const meta = getCategoryMeta(cat, categoryMetadata);
+                  const isSelected = selectedCategory === cat;
+
+                  return (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setSelectedCategory(cat)}
+                      className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-medium transition-all shrink-0 whitespace-nowrap cursor-pointer border ${
+                        isSelected
+                          ? `${meta.style.activeBg} ${meta.style.activeBorder} ${meta.style.activeText} font-bold ring-1 ${meta.style.ringColor} shadow-xs`
+                          : `bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 border-slate-700/50 ${meta.style.hoverBorder}`
+                      }`}
+                    >
+                      <div className={`w-3.5 h-3.5 rounded flex items-center justify-center shrink-0 ${isSelected ? meta.style.pillText : 'text-slate-400'}`}>
+                        {renderCategoryIcon(meta.icon, 'w-3 h-3')}
+                      </div>
+                      <span>{cat}</span>
+                      {isSelected && (
+                        <span className={`w-1.5 h-1.5 rounded-full ${meta.style.dotColor} shrink-0 animate-pulse`} />
+                      )}
+                    </button>
+                  );
+                })}
+
+                {/* Inline Add Category Form */}
+                {isAddingCategory ? (
+                  <form
+                    onSubmit={handleConfirmAddCategory}
+                    onClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    className="flex items-center gap-1 shrink-0 bg-slate-900 border border-sky-500 rounded-md p-0.5 shadow-sm"
+                  >
+                    <input
+                      ref={addCategoryInputRef}
+                      type="text"
+                      value={newCategoryName}
+                      onChange={(e) => setNewCategoryName(e.target.value)}
+                      placeholder="Новая категория..."
+                      className="px-2 py-0.5 rounded text-[11px] bg-slate-950 text-slate-100 outline-none w-32 select-text"
+                      autoFocus
+                      onClick={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => {
+                        e.stopPropagation();
+                        if (e.key === 'Escape') {
+                          setIsAddingCategory(false);
+                          setNewCategoryName('');
+                        }
+                      }}
+                    />
+                    <button
+                      type="submit"
+                      className="px-1.5 py-0.5 rounded bg-sky-600 hover:bg-sky-500 text-white text-[10.5px] font-bold cursor-pointer"
+                      title="Добавить категорию (Enter)"
+                    >
+                      <Check className="w-3 h-3" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsAddingCategory(false);
+                        setNewCategoryName('');
+                      }}
+                      className="px-1 py-0.5 rounded hover:bg-slate-800 text-slate-400 hover:text-slate-200 cursor-pointer"
+                      title="Отмена (Esc)"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </form>
+                ) : (
                   <button
                     type="button"
-                    onClick={onOpenCategoryManager}
-                    className="p-1 rounded-md text-slate-400 hover:text-sky-300 hover:bg-slate-800/80 border border-slate-700/60 transition-colors cursor-pointer shrink-0"
-                    title="Управление категориями (создание, удаление, сброс к стандартным)"
+                    onClick={() => {
+                      setIsAddingCategory(true);
+                      setTimeout(() => {
+                        addCategoryInputRef.current?.focus();
+                      }, 50);
+                    }}
+                    className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-medium text-sky-400 hover:text-sky-300 bg-sky-950/40 hover:bg-sky-900/50 border border-dashed border-sky-500/50 shrink-0 whitespace-nowrap transition-colors cursor-pointer"
+                    title="Добавить новую категорию"
                   >
-                    <FolderCog className="w-3.5 h-3.5 text-sky-400" />
+                    <FolderPlus className="w-3 h-3" />
+                    <span>+ Категория</span>
                   </button>
                 )}
               </div>
-            )}
-          </div>
 
-          {onOpenSettings && (
-            <button
-              type="button"
-              onClick={() => onOpenSettings('collections')}
-              className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold text-sky-400 hover:text-sky-300 bg-slate-800/80 hover:bg-slate-700 border border-slate-700 shrink-0 whitespace-nowrap ml-1 transition-colors cursor-pointer"
-              title="Импорт и экспорт коллекций JSON в настройках"
-            >
-              <FileJson className="w-3 h-3 text-sky-400" />
-              <span className="hidden md:inline">Коллекции</span>
-            </button>
+              {/* Right Scroll Button */}
+              {canScrollRight && (
+                <button
+                  type="button"
+                  onClick={() => handleScroll('right')}
+                  className="absolute right-0 z-10 p-1 bg-slate-900/90 hover:bg-slate-800 border border-slate-700 rounded-md text-slate-200 shadow-md cursor-pointer transition-all"
+                  title="Прокрутить вправо"
+                >
+                  <ChevronRight className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+          ) : (
+            /* Wrapped Grid Mode: All categories visible without scrolling */
+            <div className="flex flex-wrap gap-1 max-h-36 overflow-y-auto custom-scrollbar p-1 bg-slate-950/40 rounded-lg border border-slate-800/80">
+              {availableCategories.map((cat) => {
+                const meta = getCategoryMeta(cat, categoryMetadata);
+                const isSelected = selectedCategory === cat;
+
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setSelectedCategory(cat)}
+                    className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[10.5px] font-medium transition-all shrink-0 cursor-pointer border ${
+                      isSelected
+                        ? `${meta.style.activeBg} ${meta.style.activeBorder} ${meta.style.activeText} font-bold ring-1 ${meta.style.ringColor} shadow-xs`
+                        : `bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 border-slate-700/50 ${meta.style.hoverBorder}`
+                    }`}
+                  >
+                    {renderCategoryIcon(meta.icon, 'w-3 h-3')}
+                    <span>{cat}</span>
+                    {isSelected && (
+                      <span className={`w-1.5 h-1.5 rounded-full ${meta.style.dotColor} shrink-0 animate-pulse`} />
+                    )}
+                  </button>
+                );
+              })}
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAddingCategory(true);
+                  setCategoryViewMode('scroll');
+                  setTimeout(() => addCategoryInputRef.current?.focus(), 50);
+                }}
+                className="flex items-center gap-1 px-2 py-1 rounded-md text-[10.5px] font-medium text-sky-400 hover:text-sky-300 bg-sky-950/40 hover:bg-sky-900/50 border border-dashed border-sky-500/50 cursor-pointer"
+              >
+                <FolderPlus className="w-3 h-3" />
+                <span>+ Категория</span>
+              </button>
+            </div>
           )}
         </div>
 
-        {/* Action bar for Selected Category: Deletion of ANY category (standard or custom) */}
-        {selectedCategory !== 'Все' && (
-          <div className="flex items-center justify-between bg-slate-900/70 px-2.5 py-1 rounded border border-slate-800 text-[10.5px]">
-            <div className="flex items-center gap-1.5 text-slate-300">
-              <span className="font-semibold text-sky-300">{selectedCategory}</span>
-              <span className="text-slate-500 font-mono">({currentCategorySnippetCount} шаблонов)</span>
+        {/* Enhanced Active Collection Indicator Banner */}
+        <div 
+          className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg border text-[11px] transition-all ${activeCategoryMeta.style.pillBg} ${activeCategoryMeta.style.pillBorder}`}
+        >
+          <div className="flex items-center gap-2 min-w-0 flex-1 mr-2">
+            {/* Category Icon Badge with Color */}
+            <div className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 border ${activeCategoryMeta.style.pillBorder} ${activeCategoryMeta.style.pillText} bg-slate-900/60`}>
+              {renderCategoryIcon(activeCategoryMeta.icon, 'w-3.5 h-3.5')}
             </div>
-            <div className="flex items-center gap-2.5">
-              {onOpenCategoryManager && (
-                <button
-                  type="button"
-                  onClick={onOpenCategoryManager}
-                  className="text-slate-400 hover:text-sky-300 flex items-center gap-1 cursor-pointer transition-colors"
-                  title="Открыть окно управления всеми категориями"
-                >
-                  <FolderCog className="w-3 h-3" />
-                  <span>Управление</span>
-                </button>
-              )}
 
-              {onDeleteCategory && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (currentCategorySnippetCount === 0) {
-                      onDeleteCategory(selectedCategory);
-                      setSelectedCategory('Все');
-                    } else {
-                      setCategoryToDelete(selectedCategory);
-                    }
-                  }}
-                  className="flex items-center gap-1 text-rose-400 hover:text-rose-300 hover:underline cursor-pointer"
-                  title={`Удалить категорию «${selectedCategory}»`}
-                >
-                  <Trash2 className="w-3 h-3" />
-                  <span>Удалить категорию</span>
-                </button>
-              )}
+            <div className="flex items-center gap-1.5 truncate">
+              <span className={`w-1.5 h-1.5 rounded-full ${activeCategoryMeta.style.dotColor} animate-pulse shrink-0`} />
+              <span className={`font-bold truncate ${activeCategoryMeta.style.pillText}`}>
+                {selectedCategory}
+              </span>
+              <span className="text-slate-400 font-mono text-[10.5px] shrink-0">
+                ({currentCategorySnippetCount} {currentCategorySnippetCount === 1 ? 'шаблон' : 'шаблонов'})
+              </span>
             </div>
           </div>
-        )}
+
+          <div className="flex items-center gap-1.5 shrink-0">
+            {/* Quick add snippet into this collection */}
+            {selectedCategory !== 'Все' && selectedCategory !== '⭐ Избранные' && (
+              <button
+                type="button"
+                onClick={() => onCreateNew(selectedCategory)}
+                className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-900/80 hover:bg-slate-800 text-sky-300 border border-slate-700 transition-colors cursor-pointer"
+                title={`Создать новый шаблон в категории «${selectedCategory}»`}
+              >
+                <Plus className="w-3 h-3" />
+                <span>В эту коллекцию</span>
+              </button>
+            )}
+
+            {/* Reset to All */}
+            {selectedCategory !== 'Все' && (
+              <button
+                type="button"
+                onClick={() => setSelectedCategory('Все')}
+                className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition-colors cursor-pointer"
+                title="Сбросить фильтр и показать все шаблоны"
+              >
+                <X className="w-3 h-3" />
+                <span>Все</span>
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Snippet Card List */}
@@ -327,17 +546,29 @@ export const SnippetListPanel: React.FC<SnippetListPanelProps> = ({
           <div className="p-8 text-center text-slate-400">
             {selectedCategory !== 'Все' ? (
               <div className="space-y-3">
+                <div className={`w-10 h-10 rounded-xl mx-auto flex items-center justify-center border ${activeCategoryMeta.style.pillBg} ${activeCategoryMeta.style.pillBorder} ${activeCategoryMeta.style.pillText}`}>
+                  {renderCategoryIcon(activeCategoryMeta.icon, 'w-5 h-5')}
+                </div>
                 <p className="text-slate-300 text-xs">
-                  В категории «<strong className="text-white">{selectedCategory}</strong>» пока нет сохраненных шаблонов.
+                  В коллекции <strong className={activeCategoryMeta.style.pillText}>«{selectedCategory}»</strong> пока нет шаблонов
                 </p>
-                <button
-                  type="button"
-                  onClick={() => onCreateNew(selectedCategory)}
-                  className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold shadow-md cursor-pointer transition-opacity hover:opacity-90 ${accent.primary}`}
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Создать первый шаблон в «{selectedCategory}»</span>
-                </button>
+                <div className="flex items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onCreateNew(selectedCategory !== '⭐ Избранные' ? selectedCategory : undefined)}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer shadow-sm ${accent.primary}`}
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Создать первый шаблон</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCategory('Все')}
+                    className="px-3 py-1.5 rounded-lg text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer"
+                  >
+                    Показать все
+                  </button>
+                </div>
               </div>
             ) : (
               <p className="italic">
@@ -349,13 +580,14 @@ export const SnippetListPanel: React.FC<SnippetListPanelProps> = ({
           filteredSnippets.map((snippet) => {
             const isSelected = selectedSnippetId === snippet.id;
             const isCopied = copiedId === snippet.id;
-            // Templates decoupled from Excel activeRow
             const { result: previewText } = interpolateSnippet(
               snippet.content,
               placeholders,
               null,
               settings.agentName
             );
+
+            const snippetCatMeta = getCategoryMeta(snippet.category, categoryMetadata);
 
             return (
               <div
@@ -416,16 +648,26 @@ export const SnippetListPanel: React.FC<SnippetListPanelProps> = ({
                   {previewText}
                 </p>
 
-                {/* Footer Meta & Quick Action Buttons */}
+                {/* Footer Meta: Category Badge with Color and Icon, Tags, Actions */}
                 <div className="flex items-center justify-between text-[10.5px] text-slate-400 pt-1 border-t border-slate-800/60">
                   <div className="flex items-center gap-1.5 overflow-hidden">
-                    <span className="text-slate-500 font-medium truncate max-w-[130px]">
-                      {snippet.category}
+                    {/* Category Badge with Color & Icon */}
+                    <span 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedCategory(snippet.category);
+                      }}
+                      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold border transition-transform hover:scale-105 cursor-pointer ${snippetCatMeta.style.pillBg} ${snippetCatMeta.style.pillBorder} ${snippetCatMeta.style.pillText}`}
+                      title={`Фильтровать по категории «${snippet.category}»`}
+                    >
+                      {renderCategoryIcon(snippetCatMeta.icon, 'w-3 h-3')}
+                      <span className="truncate max-w-[120px]">{snippet.category}</span>
                     </span>
+
                     {snippet.tags.length > 0 && (
                       <>
                         <span className="text-slate-600">•</span>
-                        <span className="truncate text-slate-500 max-w-[150px]">
+                        <span className="truncate text-slate-500 max-w-[130px]">
                           #{snippet.tags.join(' #')}
                         </span>
                       </>

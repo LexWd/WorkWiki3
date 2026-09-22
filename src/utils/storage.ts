@@ -9,6 +9,7 @@ import {
   CopyHistoryItem, 
   AutoBackupPoint,
   FullBackupPayload,
+  CategoryMetadata,
 } from '../types';
 import { 
   DEFAULT_SNIPPETS, 
@@ -33,6 +34,7 @@ const NOTES_SCRATCHPAD_KEY = 'quickreply_ru_notes_scratchpad_v1';
 const NOTE_DRAFT_KEY = 'quickreply_ru_note_new_draft_v1';
 const RESOURCE_CATEGORIES_KEY = 'quickreply_ru_resource_categories_v2';
 const ALL_CATEGORIES_KEY = 'quickreply_ru_all_categories_v3';
+const CATEGORY_META_KEY = 'quickreply_ru_category_metadata_v1';
 const LEGACY_CUSTOM_CATEGORIES_KEY = 'quickreply_ru_custom_categories_v2';
 const COPY_HISTORY_KEY = 'quickreply_ru_copy_history_v1';
 const AUTO_BACKUPS_KEY = 'quickreply_ru_auto_backups_v1';
@@ -84,6 +86,27 @@ export const storage = {
 
   saveCustomCategories(categories: string[]) {
     this.saveCategories(categories);
+  },
+
+  loadCategoryMetadata(): Record<string, CategoryMetadata> {
+    try {
+      const data = localStorage.getItem(CATEGORY_META_KEY);
+      if (data) {
+        const parsed = JSON.parse(data);
+        if (parsed && typeof parsed === 'object') return parsed;
+      }
+    } catch (e) {
+      console.warn('Failed to load category metadata:', e);
+    }
+    return {};
+  },
+
+  saveCategoryMetadata(metaMap: Record<string, CategoryMetadata>) {
+    try {
+      localStorage.setItem(CATEGORY_META_KEY, JSON.stringify(metaMap));
+    } catch (e) {
+      console.error('Failed to save category metadata:', e);
+    }
   },
   loadSnippets(): Snippet[] {
     try {
@@ -328,6 +351,7 @@ export const storage = {
       resourceCategories: this.loadResourceCategories(),
       notes: this.loadNotes(),
       notesScratchpad: this.loadNotesScratchpad(),
+      categoryMetadata: this.loadCategoryMetadata(),
       settings: this.loadSettings(),
       metrics: this.loadMetrics(),
       copyHistory: this.loadCopyHistory(),
@@ -423,6 +447,9 @@ export const storage = {
         if (Array.isArray(parsed.resourceCategories)) this.saveResourceCategories(parsed.resourceCategories);
         if (Array.isArray(parsed.notes)) this.saveNotes(parsed.notes);
         if (typeof parsed.notesScratchpad === 'string') this.saveNotesScratchpad(parsed.notesScratchpad);
+        if (parsed.categoryMetadata && typeof parsed.categoryMetadata === 'object') {
+          this.saveCategoryMetadata(parsed.categoryMetadata);
+        }
         if (parsed.settings && typeof parsed.settings === 'object') this.saveSettings(parsed.settings);
         if (parsed.metrics && typeof parsed.metrics === 'object') this.saveMetrics(parsed.metrics);
         if (Array.isArray(parsed.copyHistory)) this.saveCopyHistory(parsed.copyHistory);

@@ -14,9 +14,10 @@ import {
   Check,
   Split
 } from 'lucide-react';
-import { Snippet, PlaceholderConfig, ExcelRow, GuiSettings } from '../types';
+import { Snippet, PlaceholderConfig, ExcelRow, GuiSettings, CategoryMetadata } from '../types';
 import { getThemeClasses, getAccentClasses } from '../utils/theme';
 import { interpolateSnippet } from '../utils/interpolator';
+import { getCategoryMeta, renderCategoryIcon } from '../utils/categoryMeta';
 
 interface SnippetEditorModalProps {
   snippet: Snippet | null;
@@ -27,6 +28,7 @@ interface SnippetEditorModalProps {
   activeRow: ExcelRow | null;
   settings: GuiSettings;
   availableCategories?: string[];
+  categoryMetadata?: Record<string, CategoryMetadata>;
   onAddNewCategory?: (newCategory: string) => void;
   initialCategory?: string;
 }
@@ -50,6 +52,7 @@ export const SnippetEditorModal: React.FC<SnippetEditorModalProps> = ({
   activeRow,
   settings,
   availableCategories = DEFAULT_CATEGORIES,
+  categoryMetadata,
   onAddNewCategory,
   initialCategory,
 }) => {
@@ -653,6 +656,21 @@ export const SnippetEditorModal: React.FC<SnippetEditorModalProps> = ({
                     + Создать новую категорию...
                   </option>
                 </select>
+              )}
+
+              {category && !isCreatingCategory && (
+                <div className="mt-1 flex items-center gap-1.5">
+                  {(() => {
+                    const meta = getCategoryMeta(category, categoryMetadata);
+                    return (
+                      <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10.5px] font-semibold border ${meta.style.pillBg} ${meta.style.pillBorder} ${meta.style.pillText}`}>
+                        {renderCategoryIcon(meta.icon, 'w-3 h-3')}
+                        <span className={`w-1.5 h-1.5 rounded-full ${meta.style.dotColor}`} />
+                        <span>Коллекция: {category}</span>
+                      </span>
+                    );
+                  })()}
+                </div>
               )}
             </div>
 

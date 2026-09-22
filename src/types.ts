@@ -8,6 +8,15 @@ export type SnippetCategory =
   | 'Завершение диалога'
   | (string & {});
 
+export type CategoryColor = 'slate' | 'sky' | 'emerald' | 'amber' | 'rose' | 'purple' | 'indigo' | 'cyan';
+
+export interface CategoryMetadata {
+  name?: string;
+  color?: CategoryColor;
+  icon?: string;
+  description?: string;
+}
+
 export interface Snippet {
   id: string;
   title: string;
@@ -187,6 +196,7 @@ export interface FullBackupPayload {
   resourceCategories: string[];
   notes: NoteCard[];
   notesScratchpad?: string;
+  categoryMetadata?: Record<string, CategoryMetadata>;
   settings: GuiSettings;
   metrics: ProductivityMetrics;
   copyHistory?: CopyHistoryItem[];
