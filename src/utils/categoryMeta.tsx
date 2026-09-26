@@ -20,7 +20,8 @@ import {
   Sparkles, 
   LifeBuoy
 } from 'lucide-react';
-import { CategoryColor, CategoryMetadata } from '../types';
+import { CategoryColor, CategoryMetadata, CustomIcon } from '../types';
+import { storage } from './storage';
 
 export interface CategoryColorDef {
   id: CategoryColor;
@@ -174,7 +175,45 @@ export const AVAILABLE_CATEGORY_ICONS: { id: string; label: string; icon: React.
   { id: 'LifeBuoy', label: 'SOS / Срочно', icon: LifeBuoy },
 ];
 
-export function renderCategoryIcon(iconName?: string, className: string = 'w-3.5 h-3.5'): React.ReactNode {
+export function renderCategoryIcon(
+  iconName?: string, 
+  className: string = 'w-3.5 h-3.5',
+  customIcons?: CustomIcon[]
+): React.ReactNode {
+  if (!iconName) return <Folder className={className} />;
+
+  // 1. Direct Data URL or external image
+  if (iconName.startsWith('data:image') || iconName.startsWith('http://') || iconName.startsWith('https://')) {
+    return <img src={iconName} alt="" className={`${className} object-contain rounded-xs shrink-0`} />;
+  }
+
+  // 2. Direct SVG string
+  if (iconName.startsWith('<svg')) {
+    return (
+      <span 
+        className={`${className} inline-flex items-center justify-center shrink-0 [&>svg]:w-full [&>svg]:h-full [&>svg]:fill-current`}
+        dangerouslySetInnerHTML={{ __html: iconName }}
+      />
+    );
+  }
+
+  // 3. Custom icon ID from storage or passed list
+  if (iconName.startsWith('custom_') || iconName.startsWith('ci_')) {
+    const list = customIcons || storage.loadCustomIcons();
+    const found = list.find((ci) => ci.id === iconName);
+    if (found) {
+      if (found.dataUrl.startsWith('<svg')) {
+        return (
+          <span 
+            className={`${className} inline-flex items-center justify-center shrink-0 [&>svg]:w-full [&>svg]:h-full [&>svg]:fill-current`}
+            dangerouslySetInnerHTML={{ __html: found.dataUrl }}
+          />
+        );
+      }
+      return <img src={found.dataUrl} alt={found.name} className={`${className} object-contain rounded-xs shrink-0`} />;
+    }
+  }
+
   switch (iconName) {
     case 'MessageSquare':
       return <MessageSquare className={className} />;

@@ -31,10 +31,19 @@ import {
   Maximize2,
   AlertCircle,
   FolderCog,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
+  ArrowLeft,
+  ArrowRight,
+  GripVertical,
+  LayoutGrid
 } from 'lucide-react';
-import { ResourceWidget, WidgetType, WidgetIconType, GuiSettings } from '../types';
+import { ResourceWidget, WidgetType, WidgetIconType, GuiSettings, CustomIcon } from '../types';
 import { getThemeClasses, getAccentClasses } from '../utils/theme';
 import { soundService } from '../utils/sound';
+import { storage } from '../utils/storage';
+import { renderCategoryIcon as renderMetaCategoryIcon } from '../utils/categoryMeta';
 import { ConfirmDialogModal } from './ConfirmDialogModal';
 import { DEFAULT_RESOURCE_CATEGORIES } from '../data/defaultData';
 import { ResourceCategoryManagerModal } from './ResourceCategoryManagerModal';
@@ -49,6 +58,8 @@ interface ResourcesAndWidgetsPanelProps {
   onRenameCategory?: (oldName: string, newName: string) => void;
   onDeleteCategory?: (category: string, reassignTo?: string) => void;
   onResetCategories?: () => void;
+  onUpdateSettings?: (partial: Partial<GuiSettings>) => void;
+  customIcons?: CustomIcon[];
   settings: GuiSettings;
 }
 
@@ -92,6 +103,19 @@ export const ResourcesAndWidgetsPanel: React.FC<ResourcesAndWidgetsPanelProps> =
   const [searchQuery, setSearchQuery] = useState('');
   const [viewFilter, setViewFilter] = useState<'all' | 'links' | 'iframes'>('all');
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
+
+  // Customization & Ordering State
+  const [customOrder, setCustomOrder] = useState<string[]>(() => storage.loadResourceOrder());
+  const [sortMode, setSortMode] = useState<'custom' | 'pinned' | 'alpha' | 'newest'>('custom');
+  const [gridCols, setGridCols] = useState<1 | 2 | 3 | 4>(() => {
+    try {
+      const saved = localStorage.getItem('quickreply_resource_grid_cols');
+      if (saved) return Number(saved) as 1 | 2 | 3 | 4;
+    } catch (_) {}
+    return 3;
+  });
+  const [cardDensity, setCardDensity] = useState<'normal' | 'compact'>('normal');
+  const [draggingCardId, setDraggingCardId] = useState<string | null>(null);
   
   // Category management modal
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
@@ -131,7 +155,12 @@ export const ResourcesAndWidgetsPanel: React.FC<ResourcesAndWidgetsPanelProps> =
   const accent = getAccentClasses(settings.accentColor);
 
   // Helper to render widget icon
-  const renderWidgetIcon = (iconType?: WidgetIconType, className = 'w-4 h-4') => {
+  const renderWidgetIcon = (iconType?: string, className = 'w-4 h-4') => {
+    if (!iconType) return <Globe className={className} />;
+    // Check if it's a custom icon ID or data URL
+    if (iconType.startsWith('custom_') || iconType.startsWith('data:image')) {
+      return renderMetaCategoryIcon(iconType, className, settings ? undefined : undefined);
+    }
     switch (iconType) {
       case 'truck':
         return <Truck className={className} />;
@@ -189,9 +218,84 @@ export const ResourcesAndWidgetsPanel: React.FC<ResourcesAndWidgetsPanelProps> =
   }, [widgets, selectedCategory, viewFilter, searchQuery]);
 
   // Separate links and iframes for dashboard sectioning
-  const linkCards = useMemo(() => {
+  const rawLinkCards = useMemo(() => {
     return filteredWidgets.filter((w) => w.type === 'link');
   }, [filteredWidgets]);
+
+  // Sorted and custom-ordered link cards
+  const sortedLinkCards = useMemo(() => {
+    const list = [...rawLinkCards];
+    if (sortMode === 'pinned') {
+      return list.sort((a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0));
+    }
+    if (sortMode === 'alpha') {
+      return list.sort((a, b) => a.title.localeCompare(b.title, 'ru'));
+    }
+    if (sortMode === 'newest') {
+      return list.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    }
+    // 'custom' order
+    return list.sort((a, b) => {
+      // pinned stay at the very top
+      if (a.isPinned && !b.isPinned) return -1;
+      if (!a.isPinned && b.isPinned) return 1;
+      const indexA = customOrder.indexOf(a.id);
+      const indexB = customOrder.indexOf(b.id);
+      if (indexA === -1 && indexB === -1) return 0;
+      if (indexA === -1) return 1;
+      if (indexB === -1) return -1;
+      return indexA - indexB;
+    });
+  }, [rawLinkCards, sortMode, customOrder]);
+
+  const handleMoveCard = (cardId: string, direction: 'prev' | 'next', e: React.MouseEvent) => {
+    e.stopPropagation();
+    const currentIds = sortedLinkCards.map((c) => c.id);
+    const idx = currentIds.indexOf(cardId);
+    if (idx === -1) return;
+    const targetIdx = direction === 'prev' ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= currentIds.length) return;
+
+    const newOrder = [...currentIds];
+    const [removed] = newOrder.splice(idx, 1);
+    newOrder.splice(targetIdx, 0, removed);
+
+    const allOtherIds = widgets.map((w) => w.id).filter((id) => !currentIds.includes(id));
+    const fullOrder = [...newOrder, ...allOtherIds];
+
+    setCustomOrder(fullOrder);
+    storage.saveResourceOrder(fullOrder);
+    soundService.playClick(settings.soundEffects);
+  };
+
+  const handleDragStart = (cardId: string, e: React.DragEvent) => {
+    setDraggingCardId(cardId);
+    e.dataTransfer.setData('text/plain', cardId);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDropOnCard = (targetCardId: string, e: React.DragEvent) => {
+    e.preventDefault();
+    const sourceId = draggingCardId || e.dataTransfer.getData('text/plain');
+    setDraggingCardId(null);
+    if (!sourceId || sourceId === targetCardId) return;
+
+    const currentIds = sortedLinkCards.map((c) => c.id);
+    const sourceIdx = currentIds.indexOf(sourceId);
+    const targetIdx = currentIds.indexOf(targetCardId);
+    if (sourceIdx === -1 || targetIdx === -1) return;
+
+    const newOrder = [...currentIds];
+    const [removed] = newOrder.splice(sourceIdx, 1);
+    newOrder.splice(targetIdx, 0, removed);
+
+    const allOtherIds = widgets.map((w) => w.id).filter((id) => !currentIds.includes(id));
+    const fullOrder = [...newOrder, ...allOtherIds];
+
+    setCustomOrder(fullOrder);
+    storage.saveResourceOrder(fullOrder);
+    soundService.playSuccess(settings.soundEffects);
+  };
 
   const iframeWidgets = useMemo(() => {
     return filteredWidgets.filter((w) => w.type === 'iframe');
@@ -505,9 +609,9 @@ export const ResourcesAndWidgetsPanel: React.FC<ResourcesAndWidgetsPanelProps> =
       {/* Main Dashboard Scrollable Canvas */}
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
         {/* SECTION 1: Active Link Cards */}
-        {(viewFilter === 'all' || viewFilter === 'links') && linkCards.length > 0 && (
+        {(viewFilter === 'all' || viewFilter === 'links') && sortedLinkCards.length > 0 && (
           <div>
-            <div className="flex items-center justify-between mb-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
               <div className="flex items-center gap-2">
                 <div className="w-5 h-5 rounded-md bg-sky-500/20 text-sky-400 flex items-center justify-center">
                   <ExternalLink className="w-3.5 h-3.5" />
@@ -516,33 +620,160 @@ export const ResourcesAndWidgetsPanel: React.FC<ResourcesAndWidgetsPanelProps> =
                   Активные карточки быстрого перехода
                 </h3>
                 <span className="text-[10px] text-slate-400 bg-slate-800 px-1.5 py-0.2 rounded font-mono">
-                  {linkCards.length}
+                  {sortedLinkCards.length}
                 </span>
               </div>
-              <span className="text-[10.5px] text-slate-400 hidden sm:inline">
-                Клик по карточке открывает сервис в браузере по умолчанию
-              </span>
+
+              {/* Layout & Order Customization Toolbar */}
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Sort Mode Selector */}
+                <div className="flex items-center gap-1 bg-slate-900/90 border border-slate-800 rounded-lg p-0.5 text-[11px]">
+                  <ArrowUpDown className="w-3 h-3 text-slate-400 ml-1" />
+                  <button
+                    type="button"
+                    onClick={() => setSortMode('custom')}
+                    className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
+                      sortMode === 'custom'
+                        ? 'bg-sky-500/20 text-sky-300 font-bold border border-sky-400/40 shadow-xs'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                    title="Ручной порядок: перемещайте карточки стрелками или перетаскиванием"
+                  >
+                    Ручной
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSortMode('pinned')}
+                    className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
+                      sortMode === 'pinned'
+                        ? 'bg-sky-500/20 text-sky-300 font-bold border border-sky-400/40 shadow-xs'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                    title="Сначала закрепленные звездочкой"
+                  >
+                    ⭐ Важные
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSortMode('alpha')}
+                    className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
+                      sortMode === 'alpha'
+                        ? 'bg-sky-500/20 text-sky-300 font-bold border border-sky-400/40 shadow-xs'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                    title="По названию (А-Я)"
+                  >
+                    А-Я
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSortMode('newest')}
+                    className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
+                      sortMode === 'newest'
+                        ? 'bg-sky-500/20 text-sky-300 font-bold border border-sky-400/40 shadow-xs'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                    title="Сначала новые"
+                  >
+                    Новые
+                  </button>
+                </div>
+
+                {/* Columns Selector */}
+                <div className="flex items-center bg-slate-900/90 border border-slate-800 rounded-lg p-0.5 text-[11px]">
+                  <span className="text-[10px] text-slate-500 px-1 font-mono">Колонки:</span>
+                  {[1, 2, 3, 4].map((col) => (
+                    <button
+                      key={col}
+                      type="button"
+                      onClick={() => {
+                        setGridCols(col as 1 | 2 | 3 | 4);
+                        try {
+                          localStorage.setItem('quickreply_resource_grid_cols', String(col));
+                        } catch (_) {}
+                      }}
+                      className={`px-1.5 py-0.5 rounded font-mono text-[10.5px] transition-all cursor-pointer ${
+                        gridCols === col
+                          ? `${accent.primary} shadow-xs font-bold`
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                      title={`Отображение в ${col} колонк${col === 1 ? 'у' : col < 5 ? 'и' : 'ок'}`}
+                    >
+                      {col}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Density Switcher */}
+                <button
+                  type="button"
+                  onClick={() => setCardDensity(cardDensity === 'normal' ? 'compact' : 'normal')}
+                  className={`px-2 py-1 rounded-lg border text-[11px] font-medium transition-colors cursor-pointer ${
+                    cardDensity === 'compact'
+                      ? 'bg-amber-500/15 border-amber-500/40 text-amber-300'
+                      : 'border-slate-800 bg-slate-900/90 text-slate-400 hover:text-slate-200'
+                  }`}
+                  title={cardDensity === 'compact' ? 'Переключить на подробный вид' : 'Переключить на компактный вид'}
+                >
+                  {cardDensity === 'compact' ? 'Компактно' : 'Подробно'}
+                </button>
+              </div>
             </div>
 
             {/* Link Cards Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-              {linkCards.map((card) => {
+            <div
+              className={`grid gap-3 ${
+                gridCols === 1
+                  ? 'grid-cols-1'
+                  : gridCols === 2
+                  ? 'grid-cols-1 md:grid-cols-2'
+                  : gridCols === 4
+                  ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+                  : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+              }`}
+            >
+              {sortedLinkCards.map((card, cardIndex) => {
                 const colorConfig = getColorClasses(card.iconColor);
+                const isFirst = cardIndex === 0;
+                const isLast = cardIndex === sortedLinkCards.length - 1;
+
                 return (
                   <div
                     key={card.id}
+                    draggable={sortMode === 'custom'}
+                    onDragStart={(e) => handleDragStart(card.id, e)}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => handleDropOnCard(card.id, e)}
                     onClick={() => handleOpenInBrowser(card.url)}
-                    className={`group relative p-3.5 rounded-xl border transition-all cursor-pointer flex flex-col justify-between ${theme.panelHeader} border-slate-800 hover:border-slate-600 hover:shadow-lg hover:-translate-y-0.5`}
+                    className={`group relative rounded-xl border transition-all cursor-pointer flex flex-col justify-between ${
+                      cardDensity === 'compact' ? 'p-2.5' : 'p-3.5'
+                    } ${theme.panelHeader} ${
+                      draggingCardId === card.id
+                        ? 'opacity-40 border-sky-400 border-dashed scale-98'
+                        : 'border-slate-800 hover:border-slate-600 hover:shadow-lg hover:-translate-y-0.5'
+                    }`}
                   >
                     <div>
                       {/* Top Row: Icon, Title, Actions */}
                       <div className="flex items-start justify-between gap-2 mb-2">
                         <div className="flex items-start gap-2.5 min-w-0">
+                          {/* Reorder drag handle indicator in custom mode */}
+                          {sortMode === 'custom' && (
+                            <div
+                              className="text-slate-600 group-hover:text-slate-400 cursor-grab active:cursor-grabbing p-0.5 -ml-1 mt-1 shrink-0"
+                              title="Перетащите для изменения порядка"
+                            >
+                              <GripVertical className="w-3.5 h-3.5" />
+                            </div>
+                          )}
+
                           {/* Custom Styled Icon */}
                           <div
-                            className={`w-9 h-9 rounded-lg border flex items-center justify-center shrink-0 ${colorConfig.bg} ${colorConfig.border} ${colorConfig.text}`}
+                            className={`rounded-lg border flex items-center justify-center shrink-0 ${
+                              cardDensity === 'compact' ? 'w-7 h-7' : 'w-9 h-9'
+                            } ${colorConfig.bg} ${colorConfig.border} ${colorConfig.text}`}
                           >
-                            {renderWidgetIcon(card.icon, 'w-4.5 h-4.5')}
+                            {renderWidgetIcon(card.icon, cardDensity === 'compact' ? 'w-3.5 h-3.5' : 'w-4.5 h-4.5')}
                           </div>
 
                           <div className="min-w-0">
@@ -559,8 +790,37 @@ export const ResourcesAndWidgetsPanel: React.FC<ResourcesAndWidgetsPanelProps> =
                         </div>
 
                         {/* Top quick icon actions */}
-                        <div className="flex items-center gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity shrink-0">
+                          {/* Move up / down arrows in custom mode */}
+                          {sortMode === 'custom' && (
+                            <div className="flex items-center bg-slate-900/90 rounded border border-slate-700/60 p-0.2 mr-1">
+                              <button
+                                type="button"
+                                disabled={isFirst}
+                                onClick={(e) => handleMoveCard(card.id, 'prev', e)}
+                                className={`p-1 rounded transition-colors ${
+                                  isFirst ? 'opacity-25 cursor-not-allowed text-slate-600' : 'text-slate-400 hover:text-sky-300 hover:bg-slate-800'
+                                }`}
+                                title="Переместить левее / выше"
+                              >
+                                <ArrowLeft className="w-3 h-3" />
+                              </button>
+                              <button
+                                type="button"
+                                disabled={isLast}
+                                onClick={(e) => handleMoveCard(card.id, 'next', e)}
+                                className={`p-1 rounded transition-colors ${
+                                  isLast ? 'opacity-25 cursor-not-allowed text-slate-600' : 'text-slate-400 hover:text-sky-300 hover:bg-slate-800'
+                                }`}
+                                title="Переместить правее / ниже"
+                              >
+                                <ArrowRight className="w-3 h-3" />
+                              </button>
+                            </div>
+                          )}
+
                           <button
+                            type="button"
                             onClick={(e) => handleTogglePin(card, e)}
                             className={`p-1 rounded hover:bg-slate-800 ${card.isPinned ? 'text-amber-400' : 'text-slate-400'}`}
                             title={card.isPinned ? 'Открепить' : 'Закрепить'}
@@ -568,6 +828,7 @@ export const ResourcesAndWidgetsPanel: React.FC<ResourcesAndWidgetsPanelProps> =
                             <Pin className="w-3 h-3" />
                           </button>
                           <button
+                            type="button"
                             onClick={(e) => handleOpenEditModal(card, e)}
                             className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-amber-400"
                             title="Редактировать карточку"
@@ -575,6 +836,7 @@ export const ResourcesAndWidgetsPanel: React.FC<ResourcesAndWidgetsPanelProps> =
                             <Edit3 className="w-3 h-3" />
                           </button>
                           <button
+                            type="button"
                             onClick={(e) => handleDelete(card, e)}
                             className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-rose-400"
                             title="Удалить карточку"
@@ -584,15 +846,15 @@ export const ResourcesAndWidgetsPanel: React.FC<ResourcesAndWidgetsPanelProps> =
                         </div>
                       </div>
 
-                      {/* Description */}
-                      {card.description && (
+                      {/* Description (hidden in compact mode) */}
+                      {cardDensity === 'normal' && card.description && (
                         <p className="text-xs text-slate-300 mb-2.5 line-clamp-2 leading-relaxed">
                           {card.description}
                         </p>
                       )}
 
-                      {/* Tags */}
-                      {card.tags.length > 0 && (
+                      {/* Tags (hidden in compact mode) */}
+                      {cardDensity === 'normal' && card.tags.length > 0 && (
                         <div className="flex flex-wrap gap-1 mb-2.5">
                           {card.tags.slice(0, 4).map((t) => (
                             <span
@@ -607,7 +869,7 @@ export const ResourcesAndWidgetsPanel: React.FC<ResourcesAndWidgetsPanelProps> =
                     </div>
 
                     {/* Bottom Link Bar */}
-                    <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-1 text-[11px] text-slate-400 mt-1">
+                    <div className={`pt-2 border-t border-slate-800/80 flex items-center justify-between gap-1 text-[11px] text-slate-400 ${cardDensity === 'compact' ? 'mt-0.5' : 'mt-1'}`}>
                       <div className="flex items-center gap-1 truncate max-w-[70%] font-mono text-[10px]">
                         <span className="truncate group-hover:text-sky-400 transition-colors">
                           {card.url.replace(/^https?:\/\//, '')}
@@ -616,6 +878,7 @@ export const ResourcesAndWidgetsPanel: React.FC<ResourcesAndWidgetsPanelProps> =
 
                       <div className="flex items-center gap-1">
                         <button
+                          type="button"
                           onClick={(e) => handleCopyLink(card.url, e)}
                           className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors"
                           title="Скопировать ссылку в буфер"

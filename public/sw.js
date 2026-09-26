@@ -2,14 +2,14 @@
 const CACHE_NAME = 'quickreply-desk-v2';
 
 const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/icon.svg',
-  '/icon.png',
-  '/pwa-192x192.png',
-  '/pwa-512x512.png',
-  '/apple-touch-icon.png'
+  './',
+  './index.html',
+  './manifest.json',
+  './icon.svg',
+  './icon.png',
+  './pwa-192x192.png',
+  './pwa-512x512.png',
+  './apple-touch-icon.png'
 ];
 
 self.addEventListener('install', (event) => {

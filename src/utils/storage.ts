@@ -10,6 +10,7 @@ import {
   AutoBackupPoint,
   FullBackupPayload,
   CategoryMetadata,
+  CustomIcon,
 } from '../types';
 import { 
   DEFAULT_SNIPPETS, 
@@ -38,8 +39,96 @@ const CATEGORY_META_KEY = 'quickreply_ru_category_metadata_v1';
 const LEGACY_CUSTOM_CATEGORIES_KEY = 'quickreply_ru_custom_categories_v2';
 const COPY_HISTORY_KEY = 'quickreply_ru_copy_history_v1';
 const AUTO_BACKUPS_KEY = 'quickreply_ru_auto_backups_v1';
+const CUSTOM_ICONS_KEY = 'quickreply_ru_custom_icons_v1';
+const HIDDEN_ICONS_KEY = 'quickreply_ru_hidden_icons_v1';
+const RESOURCE_ORDER_KEY = 'quickreply_ru_resource_order_v1';
+const NOTES_ORDER_KEY = 'quickreply_ru_notes_order_v1';
 
 export const storage = {
+  loadCustomIcons(): CustomIcon[] {
+    try {
+      const data = localStorage.getItem(CUSTOM_ICONS_KEY);
+      if (data) {
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {
+      console.warn('Failed to load custom icons:', e);
+    }
+    return [];
+  },
+
+  saveCustomIcons(icons: CustomIcon[]) {
+    try {
+      localStorage.setItem(CUSTOM_ICONS_KEY, JSON.stringify(icons));
+    } catch (e) {
+      console.error('Failed to save custom icons:', e);
+    }
+  },
+
+  loadHiddenIcons(): string[] {
+    try {
+      const data = localStorage.getItem(HIDDEN_ICONS_KEY);
+      if (data) {
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {
+      console.warn('Failed to load hidden icons:', e);
+    }
+    return [];
+  },
+
+  saveHiddenIcons(ids: string[]) {
+    try {
+      localStorage.setItem(HIDDEN_ICONS_KEY, JSON.stringify(ids));
+    } catch (e) {
+      console.error('Failed to save hidden icons:', e);
+    }
+  },
+
+  loadResourceOrder(): string[] {
+    try {
+      const data = localStorage.getItem(RESOURCE_ORDER_KEY);
+      if (data) {
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {
+      console.warn('Failed to load resource order:', e);
+    }
+    return [];
+  },
+
+  saveResourceOrder(ids: string[]) {
+    try {
+      localStorage.setItem(RESOURCE_ORDER_KEY, JSON.stringify(ids));
+    } catch (e) {
+      console.error('Failed to save resource order:', e);
+    }
+  },
+
+  loadNotesOrder(): string[] {
+    try {
+      const data = localStorage.getItem(NOTES_ORDER_KEY);
+      if (data) {
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {
+      console.warn('Failed to load notes order:', e);
+    }
+    return [];
+  },
+
+  saveNotesOrder(ids: string[]) {
+    try {
+      localStorage.setItem(NOTES_ORDER_KEY, JSON.stringify(ids));
+    } catch (e) {
+      console.error('Failed to save notes order:', e);
+    }
+  },
+
   loadCategories(): string[] {
     try {
       const data = localStorage.getItem(ALL_CATEGORIES_KEY);
@@ -352,6 +441,8 @@ export const storage = {
       notes: this.loadNotes(),
       notesScratchpad: this.loadNotesScratchpad(),
       categoryMetadata: this.loadCategoryMetadata(),
+      customIcons: this.loadCustomIcons(),
+      hiddenIconIds: this.loadHiddenIcons(),
       settings: this.loadSettings(),
       metrics: this.loadMetrics(),
       copyHistory: this.loadCopyHistory(),
@@ -450,6 +541,8 @@ export const storage = {
         if (parsed.categoryMetadata && typeof parsed.categoryMetadata === 'object') {
           this.saveCategoryMetadata(parsed.categoryMetadata);
         }
+        if (Array.isArray(parsed.customIcons)) this.saveCustomIcons(parsed.customIcons);
+        if (Array.isArray(parsed.hiddenIconIds)) this.saveHiddenIcons(parsed.hiddenIconIds);
         if (parsed.settings && typeof parsed.settings === 'object') this.saveSettings(parsed.settings);
         if (parsed.metrics && typeof parsed.metrics === 'object') this.saveMetrics(parsed.metrics);
         if (Array.isArray(parsed.copyHistory)) this.saveCopyHistory(parsed.copyHistory);

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { 
   FolderCog, 
   Plus, 
@@ -10,13 +10,16 @@ import {
   Check, 
   Edit2,
   Palette,
-  ChevronDown
+  ChevronDown,
+  Image as ImageIcon,
+  Sparkles
 } from 'lucide-react';
-import { Snippet, GuiSettings, CategoryColor, CategoryMetadata } from '../types';
+import { Snippet, GuiSettings, CategoryColor, CategoryMetadata, CustomIcon } from '../types';
 import { getThemeClasses, getAccentClasses } from '../utils/theme';
 import { DEFAULT_CATEGORY_LIST } from '../data/defaultData';
 import { soundService } from '../utils/sound';
 import { ConfirmDialogModal } from './ConfirmDialogModal';
+import { IconManagerModal } from './IconManagerModal';
 import { 
   CATEGORY_COLOR_DEFS, 
   AVAILABLE_CATEGORY_ICONS, 
@@ -35,6 +38,10 @@ interface CategoryManagerModalProps {
   onResetCategories: () => void;
   categoryMetadata?: Record<string, CategoryMetadata>;
   onUpdateCategoryMetadata?: (categoryName: string, meta: Partial<CategoryMetadata>) => void;
+  customIcons?: CustomIcon[];
+  onUpdateCustomIcons?: (icons: CustomIcon[]) => void;
+  hiddenIconIds?: string[];
+  onUpdateHiddenIconIds?: (ids: string[]) => void;
   settings: GuiSettings;
 }
 
@@ -49,12 +56,18 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   onResetCategories,
   categoryMetadata,
   onUpdateCategoryMetadata,
+  customIcons = [],
+  onUpdateCustomIcons = () => {},
+  hiddenIconIds = [],
+  onUpdateHiddenIconIds = () => {},
   settings,
 }) => {
   const [newCatName, setNewCatName] = useState('');
   const [newCatColor, setNewCatColor] = useState<CategoryColor>('sky');
   const [newCatIcon, setNewCatIcon] = useState<string>('Folder');
   const [isIconPickerOpen, setIsIconPickerOpen] = useState(false);
+  const [isIconManagerOpen, setIsIconManagerOpen] = useState(false);
+  const [targetCategoryForIcons, setTargetCategoryForIcons] = useState<string | null>(null);
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
@@ -65,6 +78,10 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   
   // Customizing existing category color & icon
   const [customizingCat, setCustomizingCat] = useState<string | null>(null);
+
+  const activeBuiltinIcons = useMemo(() => {
+    return AVAILABLE_CATEGORY_ICONS.filter((item) => !hiddenIconIds.includes(item.id));
+  }, [hiddenIconIds]);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
@@ -202,13 +219,28 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1 rounded-md text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setTargetCategoryForIcons(null);
+                setIsIconManagerOpen(true);
+              }}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold text-sky-300 hover:text-sky-200 bg-sky-950/60 hover:bg-sky-900/70 border border-sky-600/40 transition-colors cursor-pointer shadow-xs"
+              title="Загрузка своих SVG / картинок и удаление существующих"
+            >
+              <ImageIcon className="w-3.5 h-3.5 text-sky-400" />
+              <span>Свои иконки ({customIcons.length})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1 rounded-md text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Add Category Form with Color & Icon Pickers */}
@@ -225,29 +257,72 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                   } ${CATEGORY_COLOR_DEFS[newCatColor].pillBorder} ${CATEGORY_COLOR_DEFS[newCatColor].pillText}`}
                   title="Выбрать иконку коллекции"
                 >
-                  {renderCategoryIcon(newCatIcon, 'w-4 h-4')}
+                  {renderCategoryIcon(newCatIcon, 'w-4 h-4', customIcons)}
                 </button>
 
                 {/* Icon Picker Popover */}
                 {isIconPickerOpen && (
-                  <div className="absolute top-10 left-0 z-50 p-2 rounded-xl bg-slate-900 border border-slate-700 shadow-2xl w-64 grid grid-cols-4 gap-1 max-h-48 overflow-y-auto">
-                    {AVAILABLE_CATEGORY_ICONS.map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => {
-                          setNewCatIcon(item.id);
-                          setIsIconPickerOpen(false);
-                        }}
-                        className={`p-2 rounded-lg flex flex-col items-center gap-1 text-[9px] hover:bg-slate-800 transition-colors ${
-                          newCatIcon === item.id ? 'bg-sky-500/20 text-sky-300 font-bold border border-sky-400/40' : 'text-slate-400'
-                        }`}
-                        title={item.label}
-                      >
-                        {renderCategoryIcon(item.id, 'w-4 h-4')}
-                        <span className="truncate max-w-[48px]">{item.label}</span>
-                      </button>
-                    ))}
+                  <div className="absolute top-10 left-0 z-50 p-2 rounded-xl bg-slate-900 border border-slate-700 shadow-2xl w-64 max-h-56 overflow-y-auto space-y-2">
+                    {customIcons.length > 0 && (
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-bold text-sky-400 uppercase tracking-wider block px-1">Свои иконки:</span>
+                        <div className="grid grid-cols-4 gap-1">
+                          {customIcons.map((ci) => (
+                            <button
+                              key={ci.id}
+                              type="button"
+                              onClick={() => {
+                                setNewCatIcon(ci.id);
+                                setIsIconPickerOpen(false);
+                              }}
+                              className={`p-1.5 rounded-lg flex flex-col items-center gap-1 text-[9px] hover:bg-slate-800 transition-colors ${
+                                newCatIcon === ci.id ? 'bg-sky-500/25 text-sky-300 font-bold border border-sky-400/50' : 'text-slate-400'
+                              }`}
+                              title={ci.name}
+                            >
+                              {renderCategoryIcon(ci.id, 'w-4 h-4', customIcons)}
+                              <span className="truncate max-w-[48px]">{ci.name}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block px-1">Стандартные:</span>
+                      <div className="grid grid-cols-4 gap-1">
+                        {activeBuiltinIcons.map((item) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => {
+                              setNewCatIcon(item.id);
+                              setIsIconPickerOpen(false);
+                            }}
+                            className={`p-1.5 rounded-lg flex flex-col items-center gap-1 text-[9px] hover:bg-slate-800 transition-colors ${
+                              newCatIcon === item.id ? 'bg-sky-500/20 text-sky-300 font-bold border border-sky-400/40' : 'text-slate-400'
+                            }`}
+                            title={item.label}
+                          >
+                            {renderCategoryIcon(item.id, 'w-4 h-4')}
+                            <span className="truncate max-w-[48px]">{item.label.split('/')[0].trim()}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsIconPickerOpen(false);
+                        setTargetCategoryForIcons('NEW');
+                        setIsIconManagerOpen(true);
+                      }}
+                      className="w-full py-1.5 px-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-sky-400 font-semibold text-[11px] flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>Загрузить свою иконку...</span>
+                    </button>
                   </div>
                 )}
               </div>
@@ -526,9 +601,45 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                       </div>
 
                       <div className="text-[11px] text-slate-300 space-y-1">
-                        <span className="font-semibold block">Иконка коллекции:</span>
-                        <div className="grid grid-cols-6 gap-1 max-h-24 overflow-y-auto custom-scrollbar p-1 bg-slate-950/60 rounded border border-slate-800">
-                          {AVAILABLE_CATEGORY_ICONS.map((item) => {
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold block">Иконка коллекции:</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setTargetCategoryForIcons(cat);
+                              setIsIconManagerOpen(true);
+                            }}
+                            className="text-[10px] text-sky-400 hover:text-sky-300 font-medium flex items-center gap-1 cursor-pointer"
+                          >
+                            <ImageIcon className="w-2.5 h-2.5" />
+                            <span>Загрузить свою...</span>
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-6 gap-1 max-h-28 overflow-y-auto custom-scrollbar p-1.5 bg-slate-950/60 rounded border border-slate-800">
+                          {/* Custom icons first */}
+                          {customIcons.map((ci) => {
+                            const isSelected = meta.icon === ci.id;
+                            return (
+                              <button
+                                key={ci.id}
+                                type="button"
+                                onClick={() => {
+                                  if (onUpdateCategoryMetadata) {
+                                    onUpdateCategoryMetadata(cat, { icon: ci.id });
+                                  }
+                                }}
+                                className={`p-1.5 rounded flex items-center justify-center transition-colors cursor-pointer ${
+                                  isSelected ? 'bg-sky-500/25 text-sky-300 border border-sky-400/50' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                                }`}
+                                title={ci.name}
+                              >
+                                {renderCategoryIcon(ci.id, 'w-3.5 h-3.5', customIcons)}
+                              </button>
+                            );
+                          })}
+
+                          {/* Built-in icons */}
+                          {activeBuiltinIcons.map((item) => {
                             const isSelected = meta.icon === item.id;
                             return (
                               <button
@@ -539,7 +650,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                                     onUpdateCategoryMetadata(cat, { icon: item.id });
                                   }
                                 }}
-                                className={`p-1.5 rounded flex items-center justify-center transition-colors ${
+                                className={`p-1.5 rounded flex items-center justify-center transition-colors cursor-pointer ${
                                   isSelected ? 'bg-sky-500/25 text-sky-300 border border-sky-400/50' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
                                 }`}
                                 title={item.label}
@@ -595,6 +706,32 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
         cancelText="Отмена"
         variant="warning"
         settings={settings}
+      />
+
+      {/* Icon Manager Modal */}
+      <IconManagerModal
+        isOpen={isIconManagerOpen}
+        onClose={() => setIsIconManagerOpen(false)}
+        settings={settings}
+        customIcons={customIcons}
+        onUpdateCustomIcons={onUpdateCustomIcons}
+        hiddenIconIds={hiddenIconIds}
+        onUpdateHiddenIconIds={onUpdateHiddenIconIds}
+        onSelectIcon={(iconId) => {
+          if (targetCategoryForIcons === 'NEW') {
+            setNewCatIcon(iconId);
+          } else if (targetCategoryForIcons && onUpdateCategoryMetadata) {
+            onUpdateCategoryMetadata(targetCategoryForIcons, { icon: iconId });
+          }
+          setIsIconManagerOpen(false);
+        }}
+        selectedIconId={
+          targetCategoryForIcons === 'NEW' 
+            ? newCatIcon 
+            : targetCategoryForIcons 
+            ? categoryMetadata?.[targetCategoryForIcons]?.icon 
+            : undefined
+        }
       />
     </div>
   );

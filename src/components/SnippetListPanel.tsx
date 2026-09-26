@@ -18,9 +18,10 @@ import {
   Layers,
   Folder,
   SlidersHorizontal,
-  FolderTree
+  FolderTree,
+  Globe
 } from 'lucide-react';
-import { Snippet, PlaceholderConfig, ExcelRow, GuiSettings, CategoryMetadata } from '../types';
+import { Snippet, PlaceholderConfig, ExcelRow, GuiSettings, CategoryMetadata, CustomIcon } from '../types';
 import { getThemeClasses, getAccentClasses, getDensityPadding } from '../utils/theme';
 import { interpolateSnippet } from '../utils/interpolator';
 import { ConfirmDialogModal } from './ConfirmDialogModal';
@@ -42,6 +43,7 @@ interface SnippetListPanelProps {
   onSelectSnippet: (snippet: Snippet) => void;
   categories: string[];
   categoryMetadata?: Record<string, CategoryMetadata>;
+  customIcons?: CustomIcon[];
   onAddCategory: (category: string) => void;
   onDeleteCategory: (category: string, reassignTo?: string) => void;
   onOpenCategoryManager?: () => void;
@@ -61,11 +63,13 @@ export const SnippetListPanel: React.FC<SnippetListPanelProps> = ({
   onSelectSnippet,
   categories,
   categoryMetadata,
+  customIcons,
   onAddCategory,
   onDeleteCategory,
   onOpenCategoryManager,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchScope, setSearchScope] = useState<'current' | 'all'>('current');
   const [selectedCategory, setSelectedCategory] = useState('Все');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
@@ -127,14 +131,58 @@ export const SnippetListPanel: React.FC<SnippetListPanelProps> = ({
     });
   };
 
+  // Count matches across all categories
+  const allCategoryMatchesCount = useMemo(() => {
+    if (!searchQuery.trim()) return 0;
+    const q = searchQuery.toLowerCase().trim();
+    return snippets.filter((s) => {
+      return (
+        s.title.toLowerCase().includes(q) ||
+        s.shortcut.toLowerCase().includes(q) ||
+        s.content.toLowerCase().includes(q) ||
+        s.tags.some((t) => t.toLowerCase().includes(q))
+      );
+    }).length;
+  }, [snippets, searchQuery]);
+
+  // Count matches in current category
+  const currentCategoryMatchesCount = useMemo(() => {
+    if (!searchQuery.trim()) return 0;
+    const q = searchQuery.toLowerCase().trim();
+    return snippets.filter((s) => {
+      if (selectedCategory === '⭐ Избранные') {
+        if (!s.isPinned) return false;
+      } else if (selectedCategory !== 'Все') {
+        if (s.category !== selectedCategory) return false;
+      }
+      return (
+        s.title.toLowerCase().includes(q) ||
+        s.shortcut.toLowerCase().includes(q) ||
+        s.content.toLowerCase().includes(q) ||
+        s.tags.some((t) => t.toLowerCase().includes(q))
+      );
+    }).length;
+  }, [snippets, selectedCategory, searchQuery]);
+
   // Filtered & sorted snippets
   const filteredSnippets = useMemo(() => {
+    const effectiveScope = (selectedCategory === 'Все' || !searchQuery.trim()) ? 'all' : searchScope;
+
     return snippets
       .filter((s) => {
-        if (selectedCategory === '⭐ Избранные') {
-          if (!s.isPinned) return false;
-        } else if (selectedCategory !== 'Все') {
-          if (s.category !== selectedCategory) return false;
+        if (effectiveScope === 'current') {
+          if (selectedCategory === '⭐ Избранные') {
+            if (!s.isPinned) return false;
+          } else if (selectedCategory !== 'Все') {
+            if (s.category !== selectedCategory) return false;
+          }
+        } else if (effectiveScope === 'all' && !searchQuery.trim()) {
+          // If not actively searching, respect category selection
+          if (selectedCategory === '⭐ Избранные') {
+            if (!s.isPinned) return false;
+          } else if (selectedCategory !== 'Все') {
+            if (s.category !== selectedCategory) return false;
+          }
         }
 
         if (!searchQuery) return true;
@@ -153,7 +201,7 @@ export const SnippetListPanel: React.FC<SnippetListPanelProps> = ({
         // Static alphabetical sorting by title ascending (А → Я)
         return a.title.localeCompare(b.title, 'ru', { sensitivity: 'base' });
       });
-  }, [snippets, selectedCategory, searchQuery]);
+  }, [snippets, selectedCategory, searchQuery, searchScope]);
 
   const handleCopyClick = (e: React.MouseEvent, snippet: Snippet) => {
     e.stopPropagation();
@@ -244,6 +292,61 @@ export const SnippetListPanel: React.FC<SnippetListPanelProps> = ({
             <span>Новый</span>
           </button>
         </div>
+
+        {/* Search Scope Switcher (Category vs All) */}
+        {selectedCategory !== 'Все' && (
+          <div className="flex items-center gap-1 bg-slate-900/90 p-0.5 rounded-lg border border-slate-800 text-[10.5px]">
+            <button
+              type="button"
+              onClick={() => setSearchScope('current')}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-1 px-2 rounded-md font-medium transition-all cursor-pointer truncate ${
+                searchScope === 'current'
+                  ? 'bg-slate-800 text-sky-300 font-bold border border-slate-700 shadow-xs'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+              title={`Искать только внутри коллекции «${selectedCategory}»`}
+            >
+              <Folder className="w-3 h-3 text-sky-400 shrink-0" />
+              <span className="truncate">В «{selectedCategory}»</span>
+              {searchQuery && (
+                <span className="font-mono text-[9.5px] opacity-80">({currentCategoryMatchesCount})</span>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSearchScope('all')}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-1 px-2 rounded-md font-medium transition-all cursor-pointer ${
+                searchScope === 'all'
+                  ? 'bg-sky-500/20 text-sky-300 font-bold border border-sky-500/40 shadow-xs'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+              title="Искать по всем категориям и коллекциям"
+            >
+              <Globe className="w-3 h-3 text-emerald-400 shrink-0" />
+              <span>По всем папкам</span>
+              {searchQuery && (
+                <span className="font-mono text-[9.5px] opacity-80">({allCategoryMatchesCount})</span>
+              )}
+            </button>
+          </div>
+        )}
+
+        {/* Helpful suggestion prompt if 0 results in current category but found in others */}
+        {Boolean(searchQuery && searchScope === 'current' && currentCategoryMatchesCount === 0 && allCategoryMatchesCount > 0) && (
+          <div className="p-2 rounded-lg bg-sky-950/50 border border-sky-500/40 flex items-center justify-between gap-2 text-[11px] animate-in fade-in">
+            <span className="text-slate-300">
+              В этой папке нет, но есть <strong>{allCategoryMatchesCount}</strong> в других!
+            </span>
+            <button
+              type="button"
+              onClick={() => setSearchScope('all')}
+              className="px-2 py-0.5 rounded bg-sky-500 hover:bg-sky-400 text-white font-semibold text-[10px] whitespace-nowrap cursor-pointer shadow-xs transition-colors"
+            >
+              Искать везде →
+            </button>
+          </div>
+        )}
 
         {/* Tree / Dropdown Trigger & View Mode Switcher Header */}
         <div className="flex items-center justify-between gap-1.5 pt-0.5">
@@ -660,7 +763,7 @@ export const SnippetListPanel: React.FC<SnippetListPanelProps> = ({
                       className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold border transition-transform hover:scale-105 cursor-pointer ${snippetCatMeta.style.pillBg} ${snippetCatMeta.style.pillBorder} ${snippetCatMeta.style.pillText}`}
                       title={`Фильтровать по категории «${snippet.category}»`}
                     >
-                      {renderCategoryIcon(snippetCatMeta.icon, 'w-3 h-3')}
+                      {renderCategoryIcon(snippetCatMeta.icon, 'w-3 h-3', customIcons)}
                       <span className="truncate max-w-[120px]">{snippet.category}</span>
                     </span>
 

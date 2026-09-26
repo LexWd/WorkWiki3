@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { Zap, FileText } from 'lucide-react';
 import { 
   Snippet, 
   PlaceholderConfig, 
@@ -10,16 +11,17 @@ import {
   ResourceWidget,
   ImportSnippetMode,
   NoteCard,
-  CategoryMetadata
+  CategoryMetadata,
+  CustomIcon
 } from './types';
 import { storage } from './utils/storage';
 import { soundService } from './utils/sound';
 import { interpolateSnippet } from './utils/interpolator';
-import { getThemeClasses, getFontScaleStyle } from './utils/theme';
+import { getThemeClasses, getAccentClasses, getFontScaleStyle } from './utils/theme';
+import { checkForUpdate, CURRENT_APP_VERSION } from './utils/updateManager';
 import { DesktopHeader } from './components/DesktopHeader';
 import { SnippetListPanel } from './components/SnippetListPanel';
 import { LiveComposerAndResolver } from './components/LiveComposerAndResolver';
-import { ExcelTableDatabasePanel } from './components/ExcelTableDatabasePanel';
 import { PlaceholderManagerPanel } from './components/PlaceholderManagerPanel';
 import { ResourcesAndWidgetsPanel } from './components/ResourcesAndWidgetsPanel';
 import { NotesManagerPanel } from './components/NotesManagerPanel';
@@ -32,6 +34,7 @@ import { ProductivityStatsBar } from './components/ProductivityStatsBar';
 import { ToastNotice, ToastItem } from './components/ToastNotice';
 import { CategoryManagerModal } from './components/CategoryManagerModal';
 import { BackupManagerModal } from './components/BackupManagerModal';
+import { UpdateManagerModal } from './components/UpdateManagerModal';
 
 export default function App() {
   // Core persistent states
@@ -76,13 +79,35 @@ export default function App() {
   const [categories, setCategories] = useState<string[]>(() => storage.loadCategories());
   const [categoryMetadata, setCategoryMetadata] = useState<Record<string, CategoryMetadata>>(() => storage.loadCategoryMetadata());
   const [resourceCategories, setResourceCategories] = useState<string[]>(() => storage.loadResourceCategories());
+  const [customIcons, setCustomIcons] = useState<CustomIcon[]>(() => storage.loadCustomIcons());
+  const [hiddenIconIds, setHiddenIconIds] = useState<string[]>(() => storage.loadHiddenIcons());
+
+  // Update System states
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
+  const [hasUpdateAvailable, setHasUpdateAvailable] = useState(false);
+
+  // Responsive mobile/compact mode switcher
+  const [snippetMobileView, setSnippetMobileView] = useState<'catalog' | 'composer'>('catalog');
+
   const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
   const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
   const [newSnippetInitialCategory, setNewSnippetInitialCategory] = useState<string | undefined>(undefined);
 
   // Theme & font helpers
   const theme = getThemeClasses(settings.theme);
+  const accent = getAccentClasses(settings.accentColor);
   const fontScale = getFontScaleStyle(settings.fontSize);
+
+  // Automatic update check on app launch
+  useEffect(() => {
+    checkForUpdate()
+      .then((res) => {
+        if (res.hasUpdate) {
+          setHasUpdateAvailable(true);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Sync state to local storage
   useEffect(() => {
@@ -120,6 +145,14 @@ export default function App() {
   useEffect(() => {
     storage.saveCategoryMetadata(categoryMetadata);
   }, [categoryMetadata]);
+
+  useEffect(() => {
+    storage.saveCustomIcons(customIcons);
+  }, [customIcons]);
+
+  useEffect(() => {
+    storage.saveHiddenIcons(hiddenIconIds);
+  }, [hiddenIconIds]);
 
   // Apply density and font-size to document root so all components scale dynamically
   useEffect(() => {
@@ -618,10 +651,10 @@ export default function App() {
 
       const digit = getDigit(e);
 
-      // Ctrl + 1..5 -> Switch specific Tab
-      if ((e.ctrlKey || e.metaKey) && !e.altKey && digit !== null && digit >= 1 && digit <= 5) {
+      // Ctrl + 1..4 -> Switch specific Tab
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && digit !== null && digit >= 1 && digit <= 4) {
         e.preventDefault();
-        const tabList: ActiveTab[] = ['snippets', 'excel', 'placeholders', 'resources', 'notes'];
+        const tabList: ActiveTab[] = ['snippets', 'placeholders', 'resources', 'notes'];
         const nextTab = tabList[digit - 1];
         if (nextTab) setActiveTab(nextTab);
         return;
@@ -705,6 +738,8 @@ export default function App() {
     setSnippets(storage.loadSnippets());
     setCategories(storage.loadCategories());
     setCategoryMetadata(storage.loadCategoryMetadata());
+    setCustomIcons(storage.loadCustomIcons());
+    setHiddenIconIds(storage.loadHiddenIcons());
     setPlaceholders(storage.loadPlaceholders());
     setTables(storage.loadExcelTables());
     setWidgets(storage.loadResourceWidgets());
@@ -745,6 +780,8 @@ export default function App() {
         onOpenShortcuts={() => setIsShortcutsOpen(true)}
         onOpenPalette={() => setIsPaletteOpen(true)}
         onOpenBackupModal={() => setIsBackupModalOpen(true)}
+        onOpenUpdateModal={() => setIsUpdateModalOpen(true)}
+        hasUpdateAvailable={hasUpdateAvailable}
         isMiniMode={settings.windowMode === 'mini-bar'}
         onToggleMiniMode={() =>
           setSettings((prev) => ({
@@ -777,13 +814,46 @@ export default function App() {
       ) : (
         /* Full Workspace */
         <div className="flex-1 overflow-hidden flex min-w-0">
-          {/* Tab 1: Snippets & Live Composer with Draggable Resizer */}
+          {/* Tab 1: Snippets & Live Composer with Draggable Resizer & Responsive Mobile View */}
           {activeTab === 'snippets' && (
-            <div className="flex-1 flex overflow-hidden min-w-0">
+            <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-w-0 h-full">
+              {/* Responsive Sub-header for Mobile/Narrow window sizes (< md) */}
+              <div className="md:hidden flex items-center bg-slate-900 border-b border-slate-800 p-1 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setSnippetMobileView('catalog')}
+                  className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                    snippetMobileView === 'catalog'
+                      ? `${accent.primary} shadow-xs font-bold`
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <Zap className="w-3.5 h-3.5" />
+                  <span>Каталог ({snippets.length})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSnippetMobileView('composer')}
+                  className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                    snippetMobileView === 'composer'
+                      ? `${accent.primary} shadow-xs font-bold`
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>Редактор & Ответ</span>
+                  {selectedSnippet && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 ml-0.5"></span>
+                  )}
+                </button>
+              </div>
+
               {/* Left Column: Snippet Catalog */}
               <div
                 style={{ width: `${sidebarWidth}px` }}
-                className="w-full sm:w-auto shrink-0 max-w-[calc(100%-260px)] min-w-[260px] h-full overflow-hidden transition-[width] duration-75"
+                className={`h-full overflow-hidden transition-[width] duration-75 shrink-0 ${
+                  snippetMobileView === 'catalog' ? 'flex flex-1 md:flex-initial' : 'hidden md:flex'
+                } w-full md:w-auto md:max-w-[calc(100%-280px)] md:min-w-[260px]`}
               >
                 <SnippetListPanel
                   snippets={snippets}
@@ -805,16 +875,21 @@ export default function App() {
                   selectedSnippetId={selectedSnippet?.id || null}
                   onSelectSnippet={(s) => {
                     setSelectedSnippet(s);
+                    // On narrow screens, auto-switch to composer when a snippet is clicked
+                    if (window.innerWidth < 768) {
+                      setSnippetMobileView('composer');
+                    }
                   }}
                   categories={categories}
                   categoryMetadata={categoryMetadata}
+                  customIcons={customIcons}
                   onAddCategory={handleAddCategory}
                   onDeleteCategory={handleDeleteCategory}
                   onOpenCategoryManager={() => setIsCategoryManagerOpen(true)}
                 />
               </div>
 
-              {/* Resizable vertical splitter between Snippet List and Live Composer */}
+              {/* Resizable vertical splitter between Snippet List and Live Composer (desktop only) */}
               <div
                 onMouseDown={(e) => {
                   sidebarStartXRef.current = e.clientX;
@@ -826,7 +901,7 @@ export default function App() {
                   setSettings((prev) => ({ ...prev, sidebarWidth: 400 }));
                 }}
                 title="Потяните для изменения ширины каталога (двойной клик — сброс к 400px)"
-                className={`hidden sm:flex w-1.5 hover:w-2 select-none cursor-col-resize items-center justify-center shrink-0 transition-all group ${
+                className={`hidden md:flex w-1.5 hover:w-2 select-none cursor-col-resize items-center justify-center shrink-0 transition-all group ${
                   isResizingSidebar ? 'bg-sky-500 w-2' : 'bg-slate-800/80 hover:bg-sky-500/60'
                 }`}
               >
@@ -834,7 +909,11 @@ export default function App() {
               </div>
 
               {/* Right Column: Live Composer and Dynamic Resolver */}
-              <div className="hidden sm:flex flex-1 h-full min-w-0 overflow-hidden">
+              <div
+                className={`flex-1 h-full min-w-0 overflow-hidden ${
+                  snippetMobileView === 'composer' ? 'flex' : 'hidden md:flex'
+                }`}
+              >
                 <LiveComposerAndResolver
                   selectedSnippet={selectedSnippet}
                   snippets={snippets}
@@ -846,24 +925,6 @@ export default function App() {
                   onUpdateSettings={(partial) => setSettings((prev) => ({ ...prev, ...partial }))}
                 />
               </div>
-            </div>
-          )}
-
-          {/* Tab 2: Excel Database with Tags */}
-          {activeTab === 'excel' && (
-            <div className="flex-1 h-full overflow-hidden min-w-0">
-              <ExcelTableDatabasePanel
-                tables={tables}
-                activeTableId={activeTableId}
-                onSelectTable={setActiveTableId}
-                onUpdateTable={handleUpdateTable}
-                onCreateTable={handleCreateTable}
-                onDeleteTable={handleDeleteTable}
-                activeRow={activeRow}
-                onSelectActiveRow={setActiveRow}
-                settings={settings}
-                onToastNotice={(title, msg) => showToast(title, msg)}
-              />
             </div>
           )}
 
@@ -892,6 +953,7 @@ export default function App() {
                 onRenameCategory={handleRenameResourceCategory}
                 onDeleteCategory={handleDeleteResourceCategory}
                 onResetCategories={handleResetResourceCategories}
+                customIcons={customIcons}
                 settings={settings}
               />
             </div>
@@ -954,6 +1016,7 @@ export default function App() {
         settings={settings}
         availableCategories={categories}
         categoryMetadata={categoryMetadata}
+        customIcons={customIcons}
         onAddNewCategory={handleAddCategory}
         initialCategory={newSnippetInitialCategory}
       />
@@ -992,6 +1055,10 @@ export default function App() {
         onResetCategories={handleResetCategories}
         categoryMetadata={categoryMetadata}
         onUpdateCategoryMetadata={handleUpdateCategoryMetadata}
+        customIcons={customIcons}
+        onUpdateCustomIcons={setCustomIcons}
+        hiddenIconIds={hiddenIconIds}
+        onUpdateHiddenIconIds={setHiddenIconIds}
         settings={settings}
       />
 
@@ -1009,6 +1076,14 @@ export default function App() {
         settings={settings}
         metrics={metrics}
         onDataRestored={handleDataRestored}
+      />
+
+      {/* 7. Instant Update System Modal (Updates without reinstalling) */}
+      <UpdateManagerModal
+        isOpen={isUpdateModalOpen}
+        onClose={() => setIsUpdateModalOpen(false)}
+        settings={settings}
+        onToast={(title, msg) => showToast(title, msg)}
       />
     </div>
   );

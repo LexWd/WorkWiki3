@@ -19,6 +19,7 @@ import { getThemeClasses, getAccentClasses } from '../utils/theme';
 import { soundService } from '../utils/sound';
 import { DEFAULT_PLACEHOLDERS } from '../data/defaultData';
 import { ConfirmDialogModal } from './ConfirmDialogModal';
+import { ConditionalPlaceholderBuilderModal } from './ConditionalPlaceholderBuilderModal';
 
 interface PlaceholderManagerPanelProps {
   placeholders: PlaceholderConfig[];
@@ -37,6 +38,7 @@ export const PlaceholderManagerPanel: React.FC<PlaceholderManagerPanelProps> = (
   const [isCreatingNew, setIsCreatingNew] = useState(false);
   const [idToDelete, setIdToDelete] = useState<string | null>(null);
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
+  const [isConditionalBuilderOpen, setIsConditionalBuilderOpen] = useState(false);
 
   // Form states for creating / editing
   const [formKey, setFormKey] = useState('');
@@ -160,6 +162,16 @@ export const PlaceholderManagerPanel: React.FC<PlaceholderManagerPanelProps> = (
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsConditionalBuilderOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold text-white bg-purple-600 hover:bg-purple-500 shadow-sm cursor-pointer transition-colors"
+            title="Интерактивный конструктор логических условий (If/Else)"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Конструктор условий (If/Else)</span>
+          </button>
+
           <button
             onClick={handleResetDefaults}
             className={`flex items-center gap-1 px-2.5 py-1 rounded text-[11px] border border-slate-700 hover:border-slate-500 text-slate-300 transition-colors`}
@@ -585,6 +597,14 @@ export const PlaceholderManagerPanel: React.FC<PlaceholderManagerPanelProps> = (
           soundService.playCopyChime(settings.soundEffects);
         }}
         onCancel={() => setIsResetConfirmOpen(false)}
+      />
+
+      {/* Conditional Placeholder Builder Modal */}
+      <ConditionalPlaceholderBuilderModal
+        isOpen={isConditionalBuilderOpen}
+        onClose={() => setIsConditionalBuilderOpen(false)}
+        placeholders={placeholders}
+        settings={settings}
       />
     </div>
   );

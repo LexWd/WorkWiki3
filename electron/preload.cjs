@@ -10,4 +10,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   toggleAlwaysOnTop: () => ipcRenderer.invoke('window-toggle-always-on-top'),
   getAlwaysOnTop: () => ipcRenderer.invoke('window-get-always-on-top'),
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+  applyUpdateAndReload: () => ipcRenderer.invoke('apply-update-and-reload'),
 });

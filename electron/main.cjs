@@ -268,3 +268,10 @@ ipcMain.handle('window-get-always-on-top', () => {
 ipcMain.handle('get-app-version', () => {
   return app.getVersion();
 });
+
+ipcMain.handle('apply-update-and-reload', () => {
+  if (mainWindow) {
+    mainWindow.webContents.reloadIgnoringCache();
+  }
+});
+

@@ -18,6 +18,7 @@ import { Snippet, PlaceholderConfig, ExcelRow, GuiSettings, CategoryMetadata } f
 import { getThemeClasses, getAccentClasses } from '../utils/theme';
 import { interpolateSnippet } from '../utils/interpolator';
 import { getCategoryMeta, renderCategoryIcon } from '../utils/categoryMeta';
+import { ConditionalPlaceholderBuilderModal } from './ConditionalPlaceholderBuilderModal';
 
 interface SnippetEditorModalProps {
   snippet: Snippet | null;
@@ -79,6 +80,7 @@ export const SnippetEditorModal: React.FC<SnippetEditorModalProps> = ({
 
   const [isSyntaxHighlighting, setIsSyntaxHighlighting] = useState(true);
   const [showLogicCheatSheet, setShowLogicCheatSheet] = useState(false);
+  const [isConditionalBuilderOpen, setIsConditionalBuilderOpen] = useState(false);
 
   const theme = getThemeClasses(settings.theme);
   const accent = getAccentClasses(settings.accentColor);
@@ -739,14 +741,25 @@ export const SnippetEditorModal: React.FC<SnippetEditorModalProps> = ({
                     {"{{?условие:да|нет}}"}
                   </span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setShowLogicCheatSheet(!showLogicCheatSheet)}
-                  className="text-[10.5px] text-purple-400 hover:text-purple-300 flex items-center gap-1 cursor-pointer transition-colors"
-                >
-                  <HelpCircle className="w-3 h-3" />
-                  <span>{showLogicCheatSheet ? 'Скрыть подсказку' : 'Как работают условия?'}</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsConditionalBuilderOpen(true)}
+                    className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-600 hover:bg-purple-500 text-white font-semibold text-[10.5px] transition-colors cursor-pointer shadow-xs"
+                    title="Открыть интерактивный визуальный конструктор условных выражений с тестированием"
+                  >
+                    <Sparkles className="w-3 h-3" />
+                    <span>Конструктор условий (If/Else)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowLogicCheatSheet(!showLogicCheatSheet)}
+                    className="text-[10.5px] text-purple-400 hover:text-purple-300 flex items-center gap-1 cursor-pointer transition-colors"
+                  >
+                    <HelpCircle className="w-3 h-3" />
+                    <span>{showLogicCheatSheet ? 'Скрыть' : 'Справка'}</span>
+                  </button>
+                </div>
               </div>
 
               <div className="flex flex-wrap gap-1.5">
@@ -1047,6 +1060,15 @@ export const SnippetEditorModal: React.FC<SnippetEditorModalProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Conditional Placeholder Builder Modal */}
+      <ConditionalPlaceholderBuilderModal
+        isOpen={isConditionalBuilderOpen}
+        onClose={() => setIsConditionalBuilderOpen(false)}
+        placeholders={placeholders}
+        onInsertSnippet={(syntax) => handleInsertRawToken(syntax)}
+        settings={settings}
+      />
     </div>
   );
 };

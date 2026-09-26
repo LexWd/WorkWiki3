@@ -83,7 +83,14 @@ export type AccentColor = 'indigo' | 'emerald' | 'sky' | 'amber' | 'rose' | 'vio
 export type InterfaceDensity = 'compact' | 'comfortable' | 'spacious';
 export type FontSizeScale = 'sm' | 'base' | 'lg';
 export type WindowMode = 'full' | 'mini-bar';
-export type ActiveTab = 'snippets' | 'excel' | 'placeholders' | 'resources' | 'notes';
+export type ActiveTab = 'snippets' | 'placeholders' | 'resources' | 'notes';
+
+export interface CustomIcon {
+  id: string;
+  name: string;
+  dataUrl: string; // SVG or image data URL or SVG markup
+  createdAt: number;
+}
 
 export type NoteCardColor = 'slate' | 'amber' | 'blue' | 'emerald' | 'rose' | 'purple';
 
@@ -154,6 +161,11 @@ export interface GuiSettings {
   agentName: string;
   sidebarWidth?: number; // Resizable snippet panel width in px
   composerHeight?: number; // Resizable template composer input height in px
+  autoCheckUpdates?: boolean;
+  resourceColumns?: number; // 1, 2, 3, 4
+  resourceSort?: 'custom' | 'name' | 'date' | 'pinned';
+  notesColumns?: number; // 1, 2, 3, 4
+  notesSort?: 'custom' | 'updated' | 'created' | 'title';
 }
 
 export interface ProductivityMetrics {
@@ -197,6 +209,8 @@ export interface FullBackupPayload {
   notes: NoteCard[];
   notesScratchpad?: string;
   categoryMetadata?: Record<string, CategoryMetadata>;
+  customIcons?: CustomIcon[];
+  hiddenIconIds?: string[];
   settings: GuiSettings;
   metrics: ProductivityMetrics;
   copyHistory?: CopyHistoryItem[];
@@ -234,6 +248,8 @@ export interface ElectronAPI {
   toggleAlwaysOnTop: () => Promise<boolean>;
   getAlwaysOnTop: () => Promise<boolean>;
   getAppVersion: () => Promise<string>;
+  checkForUpdates?: () => Promise<{ hasUpdate: boolean; latestVersion?: string; releaseNotes?: string }>;
+  applyUpdateAndReload?: () => Promise<void>;
 }
 
 declare global {

@@ -24,7 +24,11 @@ import {
   ChevronUp,
   FilePlus,
   Send,
-  CheckCheck
+  CheckCheck,
+  ArrowUpDown,
+  ArrowLeft,
+  ArrowRight,
+  GripVertical
 } from 'lucide-react';
 import { NoteCard, NoteCardColor, GuiSettings } from '../types';
 import { getThemeClasses, getAccentClasses } from '../utils/theme';
@@ -118,6 +122,19 @@ export const NotesManagerPanel: React.FC<NotesManagerPanelProps> = ({
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [copiedNoteId, setCopiedNoteId] = useState<string | null>(null);
 
+  // Customization & Ordering State
+  const [notesOrder, setNotesOrder] = useState<string[]>(() => storage.loadNotesOrder());
+  const [sortMode, setSortMode] = useState<'custom' | 'pinned' | 'updated' | 'title' | 'color'>('custom');
+  const [gridCols, setGridCols] = useState<1 | 2 | 3 | 4>(() => {
+    try {
+      const saved = localStorage.getItem('quickreply_notes_grid_cols');
+      if (saved) return Number(saved) as 1 | 2 | 3 | 4;
+    } catch (_) {}
+    return 3;
+  });
+  const [cardDensity, setCardDensity] = useState<'normal' | 'compact'>('normal');
+  const [draggingNoteId, setDraggingNoteId] = useState<string | null>(null);
+
   const [editingNote, setEditingNote] = useState<NoteCard | null | 'NEW'>(null);
   const [noteToDelete, setNoteToDelete] = useState<NoteCard | null>(null);
 
@@ -175,9 +192,86 @@ export const NotesManagerPanel: React.FC<NotesManagerPanelProps> = ({
     });
   }, [notes, selectedCategory, selectedColor, filterChecklistOnly, searchQuery]);
 
+  // Sorted and custom-ordered notes
+  const sortedNotes = useMemo(() => {
+    const list = [...filteredNotes];
+    if (sortMode === 'pinned') {
+      return list.sort((a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0));
+    }
+    if (sortMode === 'updated') {
+      return list.sort((a, b) => b.updatedAt - a.updatedAt);
+    }
+    if (sortMode === 'title') {
+      return list.sort((a, b) => a.title.localeCompare(b.title, 'ru'));
+    }
+    if (sortMode === 'color') {
+      return list.sort((a, b) => a.color.localeCompare(b.color));
+    }
+    // 'custom' order
+    return list.sort((a, b) => {
+      if (a.isPinned && !b.isPinned) return -1;
+      if (!a.isPinned && b.isPinned) return 1;
+      const indexA = notesOrder.indexOf(a.id);
+      const indexB = notesOrder.indexOf(b.id);
+      if (indexA === -1 && indexB === -1) return 0;
+      if (indexA === -1) return 1;
+      if (indexB === -1) return -1;
+      return indexA - indexB;
+    });
+  }, [filteredNotes, sortMode, notesOrder]);
+
+  const handleMoveNote = (noteId: string, direction: 'prev' | 'next', e: React.MouseEvent) => {
+    e.stopPropagation();
+    const currentIds = sortedNotes.map((n) => n.id);
+    const idx = currentIds.indexOf(noteId);
+    if (idx === -1) return;
+    const targetIdx = direction === 'prev' ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= currentIds.length) return;
+
+    const newOrder = [...currentIds];
+    const [removed] = newOrder.splice(idx, 1);
+    newOrder.splice(targetIdx, 0, removed);
+
+    const allOtherIds = notes.map((n) => n.id).filter((id) => !currentIds.includes(id));
+    const fullOrder = [...newOrder, ...allOtherIds];
+
+    setNotesOrder(fullOrder);
+    storage.saveNotesOrder(fullOrder);
+    soundService.playClick(settings.soundEffects);
+  };
+
+  const handleDragStart = (noteId: string, e: React.DragEvent) => {
+    setDraggingNoteId(noteId);
+    e.dataTransfer.setData('text/plain', noteId);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDropOnNote = (targetNoteId: string, e: React.DragEvent) => {
+    e.preventDefault();
+    const sourceId = draggingNoteId || e.dataTransfer.getData('text/plain');
+    setDraggingNoteId(null);
+    if (!sourceId || sourceId === targetNoteId) return;
+
+    const currentIds = sortedNotes.map((n) => n.id);
+    const sourceIdx = currentIds.indexOf(sourceId);
+    const targetIdx = currentIds.indexOf(targetNoteId);
+    if (sourceIdx === -1 || targetIdx === -1) return;
+
+    const newOrder = [...currentIds];
+    const [removed] = newOrder.splice(sourceIdx, 1);
+    newOrder.splice(targetIdx, 0, removed);
+
+    const allOtherIds = notes.map((n) => n.id).filter((id) => !currentIds.includes(id));
+    const fullOrder = [...newOrder, ...allOtherIds];
+
+    setNotesOrder(fullOrder);
+    storage.saveNotesOrder(fullOrder);
+    soundService.playSuccess(settings.soundEffects);
+  };
+
   // Separate pinned and unpinned notes
-  const pinnedNotes = useMemo(() => filteredNotes.filter((n) => n.isPinned), [filteredNotes]);
-  const otherNotes = useMemo(() => filteredNotes.filter((n) => !n.isPinned), [filteredNotes]);
+  const pinnedNotes = useMemo(() => sortedNotes.filter((n) => n.isPinned), [sortedNotes]);
+  const otherNotes = useMemo(() => sortedNotes.filter((n) => !n.isPinned), [sortedNotes]);
 
   // Checklist statistics
   const checklistStats = useMemo(() => {
@@ -390,7 +484,101 @@ export const NotesManagerPanel: React.FC<NotesManagerPanelProps> = ({
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Sort Mode Selector */}
+            <div className="flex items-center gap-1 bg-slate-900 border border-slate-700/80 rounded-lg p-0.5 text-[11px]">
+              <ArrowUpDown className="w-3 h-3 text-slate-400 ml-1" />
+              <button
+                type="button"
+                onClick={() => setSortMode('custom')}
+                className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
+                  sortMode === 'custom'
+                    ? 'bg-sky-500/20 text-sky-300 font-bold border border-sky-400/40 shadow-xs'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="Ручной порядок: перемещайте заметки стрелками или перетаскиванием"
+              >
+                Ручной
+              </button>
+              <button
+                type="button"
+                onClick={() => setSortMode('pinned')}
+                className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
+                  sortMode === 'pinned'
+                    ? 'bg-sky-500/20 text-sky-300 font-bold border border-sky-400/40 shadow-xs'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="Сначала закрепленные звездочкой"
+              >
+                ⭐ Важные
+              </button>
+              <button
+                type="button"
+                onClick={() => setSortMode('updated')}
+                className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
+                  sortMode === 'updated'
+                    ? 'bg-sky-500/20 text-sky-300 font-bold border border-sky-400/40 shadow-xs'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="По дате изменения"
+              >
+                Дата
+              </button>
+              <button
+                type="button"
+                onClick={() => setSortMode('title')}
+                className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
+                  sortMode === 'title'
+                    ? 'bg-sky-500/20 text-sky-300 font-bold border border-sky-400/40 shadow-xs'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="По названию (А-Я)"
+              >
+                А-Я
+              </button>
+            </div>
+
+            {/* Grid Columns Selector (active in grid view) */}
+            {viewMode === 'grid' && (
+              <div className="flex items-center bg-slate-900 border border-slate-700/80 rounded-lg p-0.5 text-[11px]">
+                <span className="text-[10px] text-slate-500 px-1 font-mono">Колонки:</span>
+                {[1, 2, 3, 4].map((col) => (
+                  <button
+                    key={col}
+                    type="button"
+                    onClick={() => {
+                      setGridCols(col as 1 | 2 | 3 | 4);
+                      try {
+                        localStorage.setItem('quickreply_notes_grid_cols', String(col));
+                      } catch (_) {}
+                    }}
+                    className={`px-1.5 py-0.5 rounded font-mono text-[10.5px] transition-all cursor-pointer ${
+                      gridCols === col
+                        ? `${accent.primary} shadow-xs font-bold`
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                    title={`Отображение в ${col} колонк${col === 1 ? 'у' : col < 5 ? 'и' : 'ок'}`}
+                  >
+                    {col}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Density Switcher */}
+            <button
+              type="button"
+              onClick={() => setCardDensity(cardDensity === 'normal' ? 'compact' : 'normal')}
+              className={`px-2 py-1 rounded-lg border text-[11px] font-medium transition-colors cursor-pointer ${
+                cardDensity === 'compact'
+                  ? 'bg-amber-500/15 border-amber-500/40 text-amber-300'
+                  : 'border-slate-800 bg-slate-900 text-slate-400 hover:text-slate-200'
+              }`}
+              title={cardDensity === 'compact' ? 'Переключить на подробный вид' : 'Переключить на компактный вид'}
+            >
+              {cardDensity === 'compact' ? 'Компактно' : 'Подробно'}
+            </button>
+
             {/* View Mode */}
             <div className="flex items-center bg-slate-900 border border-slate-700/80 rounded-lg p-0.5">
               <button
@@ -626,7 +814,15 @@ export const NotesManagerPanel: React.FC<NotesManagerPanelProps> = ({
                 <div
                   className={
                     viewMode === 'grid'
-                      ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5'
+                      ? `grid gap-3.5 ${
+                          gridCols === 1
+                            ? 'grid-cols-1'
+                            : gridCols === 2
+                            ? 'grid-cols-1 md:grid-cols-2'
+                            : gridCols === 4
+                            ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+                            : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+                        }`
                       : 'space-y-2'
                   }
                 >
@@ -650,7 +846,15 @@ export const NotesManagerPanel: React.FC<NotesManagerPanelProps> = ({
                 <div
                   className={
                     viewMode === 'grid'
-                      ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5'
+                      ? `grid gap-3.5 ${
+                          gridCols === 1
+                            ? 'grid-cols-1'
+                            : gridCols === 2
+                            ? 'grid-cols-1 md:grid-cols-2'
+                            : gridCols === 4
+                            ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+                            : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+                        }`
                       : 'space-y-2'
                   }
                 >
@@ -892,17 +1096,37 @@ export const NotesManagerPanel: React.FC<NotesManagerPanelProps> = ({
     }
 
     // Grid / Bento Card View
+    const cardIndex = sortedNotes.findIndex((n) => n.id === note.id);
+    const isFirst = cardIndex === 0;
+    const isLast = cardIndex === sortedNotes.length - 1;
+
     return (
       <div
         key={note.id}
-        className={`rounded-xl border p-3.5 flex flex-col justify-between transition-all shadow-md group ${style.cardBg} ${style.cardBorder} ${
+        draggable={sortMode === 'custom' && !isInlineEditing}
+        onDragStart={(e) => handleDragStart(note.id, e)}
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={(e) => handleDropOnNote(note.id, e)}
+        className={`rounded-xl border flex flex-col justify-between transition-all shadow-md group ${
+          cardDensity === 'compact' ? 'p-2.5' : 'p-3.5'
+        } ${style.cardBg} ${style.cardBorder} ${
           isInlineEditing ? 'ring-1 ring-sky-500/50' : ''
+        } ${
+          draggingNoteId === note.id ? 'opacity-40 border-sky-400 border-dashed scale-98' : ''
         }`}
       >
         {/* Card Header */}
         <div>
           <div className="flex items-start justify-between gap-2 mb-2">
             <div className="flex items-center gap-1.5 flex-1 min-w-0 flex-wrap">
+              {sortMode === 'custom' && !isInlineEditing && (
+                <div
+                  className="text-slate-600 group-hover:text-slate-400 cursor-grab active:cursor-grabbing p-0.5 -ml-1 shrink-0"
+                  title="Перетащите для изменения порядка"
+                >
+                  <GripVertical className="w-3.5 h-3.5" />
+                </div>
+              )}
               <span className={`w-2 h-2 rounded-full shrink-0 ${style.dotColor}`}></span>
               <span className={`text-[10px] px-2 py-0.5 rounded font-semibold truncate ${style.badgeBg} ${style.badgeText}`}>
                 {note.category}
@@ -929,6 +1153,34 @@ export const NotesManagerPanel: React.FC<NotesManagerPanelProps> = ({
             </div>
 
             <div className="flex items-center gap-1 shrink-0">
+              {/* Move buttons in custom sort mode */}
+              {sortMode === 'custom' && !isInlineEditing && (
+                <div className="flex items-center bg-slate-900/90 rounded border border-slate-700/60 p-0.2 mr-1">
+                  <button
+                    type="button"
+                    disabled={isFirst}
+                    onClick={(e) => handleMoveNote(note.id, 'prev', e)}
+                    className={`p-1 rounded transition-colors ${
+                      isFirst ? 'opacity-25 cursor-not-allowed text-slate-600' : 'text-slate-400 hover:text-sky-300 hover:bg-slate-800'
+                    }`}
+                    title="Переместить левее / выше"
+                  >
+                    <ArrowLeft className="w-3 h-3" />
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isLast}
+                    onClick={(e) => handleMoveNote(note.id, 'next', e)}
+                    className={`p-1 rounded transition-colors ${
+                      isLast ? 'opacity-25 cursor-not-allowed text-slate-600' : 'text-slate-400 hover:text-sky-300 hover:bg-slate-800'
+                    }`}
+                    title="Переместить правее / ниже"
+                  >
+                    <ArrowRight className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
+
               {isInlineEditing ? (
                 <button
                   type="button"

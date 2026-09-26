@@ -9,10 +9,12 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>,
 );
 
-// Register service worker for PWA support
+// Register service worker for PWA support (supports GitHub Pages subpaths)
 if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch((err) => {
+    const baseUrl = import.meta.env.BASE_URL || './';
+    const swPath = baseUrl.endsWith('/') ? `${baseUrl}sw.js` : `${baseUrl}/sw.js`;
+    navigator.serviceWorker.register(swPath).catch((err) => {
       console.warn('SW registration skipped:', err);
     });
   });
