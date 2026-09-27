@@ -1,8 +1,8 @@
-# QuickReply Desk - PowerShell build script
+# WorkWiki 3 - PowerShell build script
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
 Write-Host "====================================================================" -ForegroundColor Cyan
-Write-Host "         QuickReply Desk — Автоматическая сборка Windows EXE        " -ForegroundColor Yellow
+Write-Host "         WorkWiki 3 — Автоматическая сборка Windows EXE             " -ForegroundColor Yellow
 Write-Host "====================================================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -39,9 +39,12 @@ Get-ChildItem -Path "release" -Filter "*.exe" | ForEach-Object {
 
 Invoke-Item "release"
 
-$response = Read-Host "Запустить QuickReply-Desk-Portable прямо сейчас? (Y/n)"
+$response = Read-Host "Запустить WorkWiki-3-Portable прямо сейчас? (Y/n)"
 if ($response -eq "" -or $response -match "^[yYдД]") {
-    $portable = Get-ChildItem -Path "release" -Filter "QuickReply-Desk-Portable-*.exe" | Select-Object -First 1
+    $portable = Get-ChildItem -Path "release" -Filter "WorkWiki-3-Portable-*.exe" | Select-Object -First 1
+    if (-not $portable) {
+        $portable = Get-ChildItem -Path "release" -Filter "WorkWiki*.exe" | Select-Object -First 1
+    }
     if ($portable) {
         Start-Process $portable.FullName
     }

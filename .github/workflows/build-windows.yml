@@ -34,7 +34,7 @@ jobs:
       - name: Upload Windows Executables Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: QuickReply-Desk-Windows-x64
+          name: WorkWiki-3-Windows-x64
           path: |
             release/*.exe
           retention-days: 30

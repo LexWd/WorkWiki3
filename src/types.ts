@@ -249,10 +249,22 @@ export interface ElectronAPI {
   toggleAlwaysOnTop: () => Promise<boolean>;
   getAlwaysOnTop: () => Promise<boolean>;
   getAppVersion: () => Promise<string>;
-  checkForUpdates?: () => Promise<{ hasUpdate?: boolean; latestVersion?: string; releaseNotes?: string; buildDate?: string; title?: string } | null>;
+  checkForUpdates?: () => Promise<{
+    hasUpdate?: boolean;
+    latestVersion?: string;
+    releaseNotes?: string;
+    buildDate?: string;
+    title?: string;
+    downloadUrl?: string;
+    exeUrl?: string;
+  } | null>;
   applyUpdateAndReload?: () => Promise<void>;
   copyToClipboard?: (text: string) => Promise<boolean>;
   openExternalUrl?: (url: string) => Promise<boolean>;
+  downloadUpdateExe?: (opts: { url: string; fileName?: string }) => Promise<{ success: boolean; filePath?: string; fileName?: string; error?: string }>;
+  installUpdateExe?: (filePath: string) => Promise<boolean>;
+  openDownloadedFolder?: (filePath: string) => Promise<boolean>;
+  onDownloadProgress?: (callback: (progress: { received: number; total: number; percent: number }) => void) => () => void;
 }
 
 declare global {

@@ -14,4 +14,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   applyUpdateAndReload: () => ipcRenderer.invoke('apply-update-and-reload'),
   copyToClipboard: (text) => ipcRenderer.invoke('clipboard-write-text', text),
   openExternalUrl: (url) => ipcRenderer.invoke('open-external-url', url),
+  downloadUpdateExe: (opts) => ipcRenderer.invoke('download-update-exe', opts),
+  installUpdateExe: (filePath) => ipcRenderer.invoke('install-update-exe', filePath),
+  openDownloadedFolder: (filePath) => ipcRenderer.invoke('open-downloaded-folder', filePath),
+  onDownloadProgress: (callback) => {
+    const handler = (_event, progress) => callback(progress);
+    ipcRenderer.on('update-download-progress', handler);
+    return () => ipcRenderer.removeListener('update-download-progress', handler);
+  },
 });

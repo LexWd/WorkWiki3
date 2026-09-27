@@ -4,6 +4,7 @@
   "minCompatibleVersion": "1.0.0",
   "title": "WorkWiki 3 v2.3.0",
   "downloadUrl": "https://github.com/lexwd/WorkWiki3/releases",
+  "exeUrl": "https://github.com/lexwd/WorkWiki3/releases/latest/download/WorkWiki-3-Portable-2.3.0.exe",
   "features": [
     "Обновлено официальное название приложения: WorkWiki 3",
     "Удалены англоязычные термины и технические подсказки в интерфейсе",

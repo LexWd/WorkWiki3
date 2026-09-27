@@ -15,7 +15,16 @@ let isQuitting = false;
 
 // Path to save window bounds
 function getWindowStatePath() {
-  return path.join(app.getPath('userData'), 'quickreply-window-state.json');
+  const newPath = path.join(app.getPath('userData'), 'workwiki-window-state.json');
+  const oldPath = path.join(app.getPath('userData'), 'quickreply-window-state.json');
+  if (!fs.existsSync(newPath) && fs.existsSync(oldPath)) {
+    try {
+      fs.copyFileSync(oldPath, newPath);
+    } catch {
+      // Ignore migration error
+    }
+  }
+  return newPath;
 }
 
 function loadWindowState() {
@@ -274,54 +283,198 @@ ipcMain.handle('check-for-updates', async () => {
   const urls = [
     'https://raw.githubusercontent.com/lexwd/WorkWiki3/main/public/version.json',
     'https://lexwd.github.io/WorkWiki3/version.json',
+    'https://api.github.com/repos/lexwd/WorkWiki3/releases/latest',
   ];
 
-  for (const url of urls) {
-    try {
-      const data = await new Promise((resolve, reject) => {
-        const req = https.get(
-          url,
-          {
-            headers: {
-              'User-Agent': 'WorkWiki3/2.3.0',
-              'Cache-Control': 'no-cache',
-            },
+  const fetchJson = (url) =>
+    new Promise((resolve, reject) => {
+      const req = https.get(
+        url,
+        {
+          headers: {
+            'User-Agent': `WorkWiki3/${app.getVersion() || '2.3.0'}`,
+            'Cache-Control': 'no-cache',
+            Accept: 'application/json',
           },
-          (res) => {
-            if (res.statusCode < 200 || res.statusCode >= 300) {
-              return reject(new Error(`HTTP ${res.statusCode}`));
-            }
-            let body = '';
-            res.on('data', (chunk) => (body += chunk));
-            res.on('end', () => {
-              try {
-                resolve(JSON.parse(body));
-              } catch (e) {
-                reject(e);
-              }
-            });
+        },
+        (res) => {
+          if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+            fetchJson(res.headers.location).then(resolve).catch(reject);
+            return;
           }
-        );
-        req.on('error', reject);
-        req.setTimeout(6000, () => {
-          req.destroy();
-          reject(new Error('Timeout'));
-        });
+          if (res.statusCode < 200 || res.statusCode >= 300) {
+            return reject(new Error(`HTTP ${res.statusCode}`));
+          }
+          let body = '';
+          res.on('data', (chunk) => (body += chunk));
+          res.on('end', () => {
+            try {
+              resolve(JSON.parse(body));
+            } catch (e) {
+              reject(e);
+            }
+          });
+        }
+      );
+      req.on('error', reject);
+      req.setTimeout(4000, () => {
+        req.destroy();
+        reject(new Error('Timeout'));
       });
+    });
 
-      if (data && data.version) {
+  // Try mirrors in parallel
+  const attempts = await Promise.allSettled(urls.map((u) => fetchJson(u)));
+  for (const attempt of attempts) {
+    if (attempt.status === 'fulfilled' && attempt.value) {
+      const data = attempt.value;
+      // Handle either version.json or GitHub Release payload
+      if (data.version) {
         return {
           latestVersion: data.version,
           buildDate: data.buildDate,
-          title: data.title,
-          releaseNotes: (data.features || []).join('\n'),
+          title: data.title || `WorkWiki 3 v${data.version}`,
+          releaseNotes: Array.isArray(data.features) ? data.features.join('\n') : (data.releaseNotes || ''),
+          downloadUrl: data.downloadUrl || 'https://github.com/lexwd/WorkWiki3/releases',
+          exeUrl: data.exeUrl,
+        };
+      } else if (data.tag_name) {
+        const ver = data.tag_name.replace(/^v/, '');
+        const exeAsset = Array.isArray(data.assets) ? data.assets.find((a) => a.name && a.name.endsWith('.exe')) : null;
+        return {
+          latestVersion: ver,
+          buildDate: data.published_at ? data.published_at.slice(0, 10) : undefined,
+          title: data.name || `WorkWiki 3 v${ver}`,
+          releaseNotes: data.body || '',
+          downloadUrl: data.html_url || 'https://github.com/lexwd/WorkWiki3/releases',
+          exeUrl: exeAsset ? exeAsset.browser_download_url : undefined,
         };
       }
-    } catch (err) {
-      console.warn(`Check update failed from ${url}:`, err.message);
     }
   }
+
   return null;
+});
+
+// Download updated .exe file directly to Downloads directory
+ipcMain.handle('download-update-exe', async (_event, { url, fileName }) => {
+  const https = require('https');
+  const http = require('http');
+  const targetFileName = fileName || `WorkWiki-3-Portable-${Date.now()}.exe`;
+  const downloadsDir = app.getPath('downloads');
+  const destPath = path.join(downloadsDir, targetFileName);
+
+  const downloadWithRedirect = (targetUrl, redirectCount = 0) =>
+    new Promise((resolve, reject) => {
+      if (redirectCount > 6) {
+        return reject(new Error('Слишком много перенаправлений (redirect loop)'));
+      }
+
+      const client = targetUrl.startsWith('https:') ? https : http;
+      const req = client.get(
+        targetUrl,
+        {
+          headers: {
+            'User-Agent': `WorkWiki3/${app.getVersion() || '2.3.0'}`,
+            Accept: '*/*',
+          },
+        },
+        (res) => {
+          if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+            return resolve(downloadWithRedirect(res.headers.location, redirectCount + 1));
+          }
+
+          if (res.statusCode !== 200) {
+            return reject(new Error(`Сервер вернул статус HTTP ${res.statusCode}`));
+          }
+
+          const total = parseInt(res.headers['content-length'] || '0', 10);
+          let received = 0;
+          const fileStream = fs.createWriteStream(destPath);
+
+          res.on('data', (chunk) => {
+            received += chunk.length;
+            fileStream.write(chunk);
+            if (total > 0 && mainWindow) {
+              const percent = Math.min(100, Math.round((received / total) * 100));
+              mainWindow.webContents.send('update-download-progress', { received, total, percent });
+            }
+          });
+
+          res.on('end', () => {
+            fileStream.end(() => {
+              resolve({ success: true, filePath: destPath, fileName: targetFileName });
+            });
+          });
+
+          res.on('error', (err) => {
+            fileStream.close();
+            try { fs.unlinkSync(destPath); } catch {}
+            reject(err);
+          });
+        }
+      );
+
+      req.on('error', (err) => {
+        try { fs.unlinkSync(destPath); } catch {}
+        reject(err);
+      });
+
+      req.setTimeout(60000, () => {
+        req.destroy();
+        try { fs.unlinkSync(destPath); } catch {}
+        reject(new Error('Превышено время ожидания скачивания'));
+      });
+    });
+
+  try {
+    return await downloadWithRedirect(url);
+  } catch (err) {
+    console.error('Download update failed:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// Launch newly downloaded .exe and safely quit running app
+ipcMain.handle('install-update-exe', async (_event, filePath) => {
+  if (!filePath || !fs.existsSync(filePath)) {
+    return false;
+  }
+
+  const { spawn } = require('child_process');
+  try {
+    // Spawn detached process
+    const child = spawn(filePath, [], {
+      detached: true,
+      stdio: 'ignore',
+    });
+    child.unref();
+
+    // Safely exit current instance after short delay so new instance can acquire lock
+    setTimeout(() => {
+      isQuitting = true;
+      app.quit();
+    }, 600);
+    return true;
+  } catch (err) {
+    console.error('Failed to spawn new exe:', err);
+    try {
+      shell.openPath(filePath);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+});
+
+ipcMain.handle('open-downloaded-folder', (_event, filePath) => {
+  if (filePath && fs.existsSync(filePath)) {
+    shell.showItemInFolder(filePath);
+    return true;
+  }
+  const downloadsDir = app.getPath('downloads');
+  shell.openPath(downloadsDir);
+  return true;
 });
 
 ipcMain.handle('clipboard-write-text', (_event, text) => {

@@ -1,10 +1,10 @@
 @echo off
 chcp 65001 >nul
-title QuickReply Desk — Сборка Windows EXE
+title WorkWiki 3 — Сборка Windows EXE
 cls
 
 echo ====================================================================
-echo             QuickReply Desk — Сборка EXE для Windows
+echo             WorkWiki 3 — Сборка EXE для Windows
 echo ====================================================================
 echo.
 
@@ -44,8 +44,8 @@ echo.
 echo [3/3] Сборка успешно завершена!
 echo.
 echo Файлы готовы в папке "release":
-echo   1. QuickReply-Desk-Portable-1.0.0.exe  (Один автономный файл, запуск без установки)
-echo   2. QuickReply Desk Setup 1.0.0.exe     (Классический инсталлятор с ярлыками)
+echo   1. WorkWiki-3-Portable-2.3.0.exe  (Один автономный файл, запуск без установки)
+echo   2. WorkWiki 3 Setup 2.3.0.exe     (Классический инсталлятор с ярлыками)
 echo.
 echo Открываем папку с готовыми файлами...
 start "" "release"
@@ -54,7 +54,7 @@ echo.
 set /p runNow="Запустить Portable EXE прямо сейчас? (Y/N, по умолчанию Y): "
 if /i "%runNow%"=="" set runNow=Y
 if /i "%runNow%"=="Y" (
-    for %%F in (release\QuickReply-Desk-Portable-*.exe) do (
+    for %%F in (release\WorkWiki-3-Portable-*.exe release\WorkWiki*.exe) do (
         echo Запуск %%F...
         start "" "%%F"
         goto end

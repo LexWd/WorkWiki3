@@ -99,16 +99,43 @@ export default function App() {
   const accent = getAccentClasses(settings.accentColor);
   const fontScale = getFontScaleStyle(settings.fontSize);
 
-  // Automatic update check on app launch
-  useEffect(() => {
-    checkForUpdate()
-      .then((res) => {
-        if (res.hasUpdate) {
-          setHasUpdateAvailable(true);
-        }
-      })
-      .catch(() => {});
+  // Toast notification helper with guaranteed uniqueness
+  const toastCounterRef = useRef(0);
+  const showToast = useCallback((title: string, preview: string) => {
+    toastCounterRef.current += 1;
+    const id = `toast-${Date.now()}-${toastCounterRef.current}-${Math.random().toString(36).slice(2, 7)}`;
+    setToasts((prev) => [...prev, { id, title, preview }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 2400);
   }, []);
+
+  // Automatic update check & post-update confirmation on app launch
+  useEffect(() => {
+    // Check if an update was just successfully applied
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      const justUpdatedVersion = window.sessionStorage.getItem('workwiki_just_updated');
+      if (justUpdatedVersion) {
+        window.sessionStorage.removeItem('workwiki_just_updated');
+        setTimeout(() => {
+          showToast(
+            'Обновление успешно применено',
+            `WorkWiki 3 успешно обновлена до актуальной версии (v${justUpdatedVersion}). Все шаблоны и настройки сохранены.`
+          );
+        }, 600);
+      }
+    }
+
+    if (settings.autoCheckUpdates !== false) {
+      checkForUpdate()
+        .then((res) => {
+          if (res.hasUpdate) {
+            setHasUpdateAvailable(true);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [settings.autoCheckUpdates, showToast]);
 
   // Sync state to local storage
   useEffect(() => {
@@ -197,17 +224,6 @@ export default function App() {
       window.removeEventListener('mouseup', handleMouseUp);
     };
   }, [isResizingSidebar, sidebarWidth]);
-
-  // Toast notification helper with guaranteed uniqueness
-  const toastCounterRef = useRef(0);
-  const showToast = useCallback((title: string, preview: string) => {
-    toastCounterRef.current += 1;
-    const id = `toast-${Date.now()}-${toastCounterRef.current}-${Math.random().toString(36).slice(2, 7)}`;
-    setToasts((prev) => [...prev, { id, title, preview }]);
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 2400);
-  }, []);
 
   // Copy snippet or resolved text
   const handleCopySnippet = useCallback(
@@ -1085,6 +1101,8 @@ export default function App() {
         isOpen={isUpdateModalOpen}
         onClose={() => setIsUpdateModalOpen(false)}
         settings={settings}
+        onUpdateSettings={(partial) => setSettings((prev) => ({ ...prev, ...partial }))}
+        onOpenBackupModal={() => setIsBackupModalOpen(true)}
         onToast={(title, msg) => showToast(title, msg)}
       />
     </div>

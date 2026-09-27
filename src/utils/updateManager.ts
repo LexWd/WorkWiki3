@@ -12,6 +12,7 @@ export interface VersionInfo {
   title?: string;
   features?: string[];
   downloadUrl?: string;
+  exeUrl?: string;
 }
 
 export interface UpdateCheckResult {
@@ -22,6 +23,8 @@ export interface UpdateCheckResult {
   title?: string;
   features: string[];
   downloadUrl?: string;
+  exeUrl?: string;
+  isElectron: boolean;
   checkFailed?: boolean;
   errorMessage?: string;
 }
@@ -42,7 +45,7 @@ export function compareSemver(current: string, target: string): number {
 /**
  * Fetch with strict timeout using AbortController to prevent hanging UI
  */
-async function fetchWithTimeout(url: string, timeoutMs = 3500): Promise<Response> {
+async function fetchWithTimeout(url: string, timeoutMs = 3200): Promise<Response> {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -53,6 +56,7 @@ async function fetchWithTimeout(url: string, timeoutMs = 3500): Promise<Response
       headers: {
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         Pragma: 'no-cache',
+        Accept: 'application/json',
       },
     });
     return response;
@@ -74,141 +78,261 @@ export const updateManager = {
     return GITHUB_RELEASES_URL;
   },
 
+  isElectronApp(): boolean {
+    return Boolean(typeof window !== 'undefined' && window.electronAPI?.isElectron);
+  },
+
   openExternalUrl(url: string): void {
-    if (window.electronAPI?.openExternalUrl) {
+    if (typeof window !== 'undefined' && window.electronAPI?.openExternalUrl) {
       window.electronAPI.openExternalUrl(url);
-    } else {
+    } else if (typeof window !== 'undefined') {
       window.open(url, '_blank', 'noopener,noreferrer');
     }
   },
 
+  /**
+   * Performs an ultra-fast, resilient multi-source check for updates across:
+   * 1. Electron Native IPC bridge (if running in desktop container)
+   * 2. Raw GitHub repository branch manifest
+   * 3. GitHub Pages CDN mirror
+   * 4. Current host's local `/version.json` (for web/PWA deployed instances)
+   * 5. GitHub Releases REST API (extracts direct .exe asset URLs)
+   */
   async checkForUpdates(): Promise<UpdateCheckResult> {
-    // 1. If running in Electron desktop container, try native HTTPS IPC bridge first
-    if (window.electronAPI?.checkForUpdates) {
-      try {
-        const electronRes = await window.electronAPI.checkForUpdates();
-        if (electronRes && electronRes.latestVersion) {
-          const hasUpdate = compareSemver(CURRENT_APP_VERSION, electronRes.latestVersion) > 0;
-          return {
-            hasUpdate,
-            currentVersion: CURRENT_APP_VERSION,
-            latestVersion: electronRes.latestVersion,
-            buildDate: electronRes.buildDate,
-            title: electronRes.title,
-            features: electronRes.releaseNotes ? electronRes.releaseNotes.split('\n').filter(Boolean) : [],
-            downloadUrl: GITHUB_RELEASES_URL,
-            checkFailed: false,
-          };
-        }
-      } catch (err) {
-        console.warn('Electron IPC update check failed, attempting HTTP fallback:', err);
-      }
-    }
+    const isElectron = this.isElectronApp();
+    const fetchedResults: VersionInfo[] = [];
 
-    // 2. Web / Browser / PWA multi-source fetch with strict timeout
-    const baseUrl = import.meta.env.BASE_URL || './';
+    // Source A: Electron native HTTPS check (runs in main node process with custom user-agent)
+    const electronPromise = (async (): Promise<VersionInfo | null> => {
+      if (typeof window !== 'undefined' && window.electronAPI?.checkForUpdates) {
+        try {
+          const res = await window.electronAPI.checkForUpdates();
+          if (res && res.latestVersion) {
+            return {
+              version: res.latestVersion,
+              buildDate: res.buildDate,
+              title: res.title,
+              features: res.releaseNotes ? res.releaseNotes.split('\n').filter(Boolean) : [],
+              downloadUrl: res.downloadUrl || GITHUB_RELEASES_URL,
+              exeUrl: res.exeUrl,
+            };
+          }
+        } catch (err) {
+          console.warn('Electron IPC update check warning:', err);
+        }
+      }
+      return null;
+    })();
+
+    // Source B: Web candidate mirrors (fetched in parallel with strict 3.2s timeout)
+    const baseUrl = typeof window !== 'undefined' && import.meta.env.BASE_URL ? import.meta.env.BASE_URL : './';
     const localVersionPath = baseUrl.endsWith('/') ? `${baseUrl}version.json` : `${baseUrl}/version.json`;
 
-    // Prioritized list of endpoints to check (GitHub Pages CDN first for global accessibility, then raw github, then local)
-    const candidateUrls: string[] = [
-      'https://lexwd.github.io/WorkWiki3/version.json',
+    const webCandidates = [
       'https://raw.githubusercontent.com/lexwd/WorkWiki3/main/public/version.json',
-      localVersionPath,
+      'https://lexwd.github.io/WorkWiki3/version.json',
     ];
 
-    let lastError: any = null;
+    // Only add local host path if running over http/https (skip inside file://)
+    if (typeof window !== 'undefined' && window.location.protocol.startsWith('http')) {
+      webCandidates.push(localVersionPath);
+    }
 
-    for (const url of candidateUrls) {
+    const webPromises = webCandidates.map(async (url): Promise<VersionInfo | null> => {
       try {
-        const res = await fetchWithTimeout(url, 3500);
-        if (!res.ok) {
-          throw new Error(`HTTP ${res.status}`);
+        const res = await fetchWithTimeout(url, 3200);
+        if (!res.ok) return null;
+        const data = await res.json();
+        if (data && data.version) {
+          return {
+            version: String(data.version).trim(),
+            buildDate: data.buildDate,
+            title: data.title || `WorkWiki 3 v${data.version}`,
+            features: Array.isArray(data.features) ? data.features : [],
+            downloadUrl: data.downloadUrl || GITHUB_RELEASES_URL,
+            exeUrl: data.exeUrl,
+          };
         }
+      } catch {
+        // Silently catch individual mirror timeout or network errors
+      }
+      return null;
+    });
 
-        const info: VersionInfo = await res.json();
-        if (!info || !info.version) {
-          throw new Error('Некорректный формат файла версий');
+    // Source C: GitHub Releases public API
+    const githubReleasePromise = (async (): Promise<VersionInfo | null> => {
+      try {
+        const res = await fetchWithTimeout('https://api.github.com/repos/lexwd/WorkWiki3/releases/latest', 3200);
+        if (!res.ok) return null;
+        const release = await res.json();
+        if (release && release.tag_name) {
+          const ver = release.tag_name.replace(/^v/, '');
+          const exeAsset = Array.isArray(release.assets)
+            ? release.assets.find((a: any) => a.name && a.name.toLowerCase().endsWith('.exe'))
+            : null;
+          return {
+            version: ver,
+            buildDate: release.published_at ? release.published_at.slice(0, 10) : undefined,
+            title: release.name || `WorkWiki 3 v${ver}`,
+            features: release.body
+              ? release.body.split('\n').map((s: string) => s.replace(/^[-*]\s*/, '').trim()).filter(Boolean)
+              : [],
+            downloadUrl: release.html_url || GITHUB_RELEASES_URL,
+            exeUrl: exeAsset ? exeAsset.browser_download_url : undefined,
+          };
         }
+      } catch {
+        // Rate-limit or 404 is acceptable
+      }
+      return null;
+    })();
 
-        const hasUpdate = compareSemver(CURRENT_APP_VERSION, info.version) > 0;
+    // Run all checks in parallel
+    const allResults = await Promise.allSettled([
+      electronPromise,
+      ...webPromises,
+      githubReleasePromise,
+    ]);
 
-        return {
-          hasUpdate,
-          currentVersion: CURRENT_APP_VERSION,
-          latestVersion: info.version,
-          buildDate: info.buildDate,
-          title: info.title,
-          features: info.features || [],
-          downloadUrl: info.downloadUrl || GITHUB_RELEASES_URL,
-          checkFailed: false,
-        };
-      } catch (err: any) {
-        lastError = err;
-        // Proceed to next candidate immediately
+    for (const r of allResults) {
+      if (r.status === 'fulfilled' && r.value && r.value.version) {
+        fetchedResults.push(r.value);
       }
     }
 
-    console.warn('All update sources failed:', lastError);
+    if (fetchedResults.length === 0) {
+      return {
+        hasUpdate: false,
+        currentVersion: CURRENT_APP_VERSION,
+        latestVersion: CURRENT_APP_VERSION,
+        features: [],
+        downloadUrl: GITHUB_RELEASES_URL,
+        isElectron,
+        checkFailed: true,
+        errorMessage: 'Не удалось связаться с серверами обновлений. Проверьте интернет-соединение или страницу релизов на GitHub.',
+      };
+    }
+
+    // Sort to pick the absolute highest version found across all mirrors
+    fetchedResults.sort((a, b) => compareSemver(a.version, b.version));
+    const highest = fetchedResults[fetchedResults.length - 1];
+
+    const hasUpdate = compareSemver(CURRENT_APP_VERSION, highest.version) > 0;
+
     return {
-      hasUpdate: false,
+      hasUpdate,
       currentVersion: CURRENT_APP_VERSION,
-      latestVersion: CURRENT_APP_VERSION,
-      features: [],
-      downloadUrl: GITHUB_RELEASES_URL,
-      checkFailed: true,
-      errorMessage: 'Сервер обновлений временно недоступен. Проверьте интернет-соединение или страницу релизов на GitHub.',
+      latestVersion: highest.version,
+      buildDate: highest.buildDate,
+      title: highest.title,
+      features: highest.features || [],
+      downloadUrl: highest.downloadUrl || GITHUB_RELEASES_URL,
+      exeUrl: highest.exeUrl,
+      isElectron,
+      checkFailed: false,
     };
   },
 
   /**
-   * Applies update without re-installing:
+   * Applies update without losing user data:
    * 1. Safely snapshots all user data to storage/auto-backups
-   * 2. Clears stale Service Worker caches
-   * 3. Triggers Service Worker update
-   * 4. Reloads the window seamlessly
+   * 2. Sets notification flag for next launch
+   * 3. Clears outdated CacheStorage
+   * 4. Instructs Service Workers to SKIP_WAITING and update
+   * 5. Forces a clean cache-busting reload of the app
    */
-  async applyUpdateAndReload(): Promise<void> {
+  async applyUpdateAndReload(targetVersion?: string): Promise<void> {
     try {
-      // Step 1: Auto safety snapshot
-      storage.createAutoBackup(`Резервная копия перед обновлением до актуальной версии`);
+      // Step 1: Create automated backup point before applying new version
+      try {
+        storage.createAutoBackup(`Резервная копия перед обновлением до v${targetVersion || CURRENT_APP_VERSION}`);
+      } catch (backupErr) {
+        console.warn('Backup before update warning:', backupErr);
+      }
 
-      // Step 2: Clear outdated caches if in browser/PWA
-      if ('caches' in window) {
+      // Step 2: Set flag in sessionStorage to notify user upon reload
+      if (typeof window !== 'undefined' && window.sessionStorage) {
+        window.sessionStorage.setItem('workwiki_just_updated', targetVersion || CURRENT_APP_VERSION);
+      }
+
+      // Step 3: Clear outdated CacheStorage in browser / PWA
+      if (typeof window !== 'undefined' && 'caches' in window) {
         try {
           const keys = await caches.keys();
           await Promise.all(keys.map((k) => caches.delete(k)));
         } catch (e) {
-          console.warn('Could not clear caches:', e);
+          console.warn('Could not clear CacheStorage:', e);
         }
       }
 
-      // Step 3: Service Worker update trigger
-      if ('serviceWorker' in navigator) {
+      // Step 4: Service Worker update trigger & skip waiting
+      if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
         try {
           const registrations = await navigator.serviceWorker.getRegistrations();
           for (const reg of registrations) {
-            await reg.update();
             if (reg.waiting) {
               reg.waiting.postMessage({ type: 'SKIP_WAITING' });
             }
+            if (reg.active) {
+              reg.active.postMessage({ type: 'SKIP_WAITING' });
+            }
+            await reg.update().catch(() => {});
           }
         } catch (e) {
           console.warn('Could not update service worker:', e);
         }
       }
 
-      // Step 4: If Electron
-      if (window.electronAPI?.applyUpdateAndReload) {
+      // Step 5: If in Electron desktop environment
+      if (typeof window !== 'undefined' && window.electronAPI?.applyUpdateAndReload) {
         await window.electronAPI.applyUpdateAndReload();
         return;
       }
 
-      // Step 5: Force hard reload
-      window.location.reload();
+      // Step 6: Hard reload with cache-buster parameter in Web/PWA
+      if (typeof window !== 'undefined') {
+        const cleanUrl = window.location.origin + window.location.pathname;
+        window.location.href = `${cleanUrl}?_update=${Date.now()}`;
+      }
     } catch (err) {
-      console.error('Error during update apply:', err);
-      window.location.reload();
+      console.error('Error during applyUpdateAndReload:', err);
+      if (typeof window !== 'undefined') {
+        window.location.reload();
+      }
     }
+  },
+
+  /**
+   * Electron-specific .exe downloader with real-time progress
+   */
+  async downloadExeUpdate(
+    url: string,
+    fileName?: string
+  ): Promise<{ success: boolean; filePath?: string; fileName?: string; error?: string }> {
+    if (typeof window !== 'undefined' && window.electronAPI?.downloadUpdateExe) {
+      return await window.electronAPI.downloadUpdateExe({ url, fileName });
+    }
+    return { success: false, error: 'Доступно только в настольном приложении Windows' };
+  },
+
+  /**
+   * Launches newly downloaded .exe and closes the current application
+   */
+  async installExeUpdate(filePath: string): Promise<boolean> {
+    if (typeof window !== 'undefined' && window.electronAPI?.installUpdateExe) {
+      return await window.electronAPI.installUpdateExe(filePath);
+    }
+    return false;
+  },
+
+  /**
+   * Opens the download folder in Windows Explorer
+   */
+  async openDownloadedFolder(filePath?: string): Promise<boolean> {
+    if (typeof window !== 'undefined' && window.electronAPI?.openDownloadedFolder) {
+      return await window.electronAPI.openDownloadedFolder(filePath || '');
+    }
+    return false;
   },
 };
 
