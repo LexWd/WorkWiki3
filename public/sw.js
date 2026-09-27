@@ -1,5 +1,5 @@
 // Service Worker for QuickReply Desk (PWA offline caching)
-const CACHE_NAME = 'quickreply-desk-v2';
+const CACHE_NAME = 'quickreply-desk-v2-2';
 
 const STATIC_ASSETS = [
   './',
@@ -35,6 +35,14 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
   const url = new URL(event.request.url);
+
+  // Never cache version.json - always fetch live from network with no-store
+  if (url.pathname.endsWith('version.json')) {
+    event.respondWith(
+      fetch(event.request, { cache: 'no-store' }).catch(() => caches.match(event.request))
+    );
+    return;
+  }
 
   // Network-first for HTML, Stale-while-revalidate for assets
   if (event.request.mode === 'navigate' || url.pathname === '/' || url.pathname.endsWith('.html')) {

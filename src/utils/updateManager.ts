@@ -1,6 +1,6 @@
 import { storage } from './storage';
 
-export const CURRENT_APP_VERSION = '2.1.0';
+export const CURRENT_APP_VERSION = '2.2.0';
 export const BUILD_DATE = '2026-09-26';
 
 export interface VersionInfo {
@@ -18,9 +18,11 @@ export interface UpdateCheckResult {
   buildDate?: string;
   title?: string;
   features: string[];
+  checkFailed?: boolean;
+  errorMessage?: string;
 }
 
-function compareSemver(current: string, target: string): number {
+export function compareSemver(current: string, target: string): number {
   const cParts = current.replace(/^v/, '').split('.').map((n) => parseInt(n, 10) || 0);
   const tParts = target.replace(/^v/, '').split('.').map((n) => parseInt(n, 10) || 0);
 
@@ -43,60 +45,89 @@ export const updateManager = {
   },
 
   async checkForUpdates(): Promise<UpdateCheckResult> {
-    try {
-      // 1. If in Electron and electronAPI provides update check
-      if (window.electronAPI?.checkForUpdates) {
-        try {
-          const electronRes = await window.electronAPI.checkForUpdates();
-          if (electronRes && electronRes.latestVersion) {
-            const hasUpdate = compareSemver(CURRENT_APP_VERSION, electronRes.latestVersion) > 0;
-            return {
-              hasUpdate,
-              currentVersion: CURRENT_APP_VERSION,
-              latestVersion: electronRes.latestVersion,
-              features: electronRes.releaseNotes ? [electronRes.releaseNotes] : [],
-            };
-          }
-        } catch {
-          // Fallback to fetch
+    // 1. If running in Electron desktop container, use native HTTPS IPC bridge
+    if (window.electronAPI?.checkForUpdates) {
+      try {
+        const electronRes = await window.electronAPI.checkForUpdates();
+        if (electronRes && electronRes.latestVersion) {
+          const hasUpdate = compareSemver(CURRENT_APP_VERSION, electronRes.latestVersion) > 0;
+          return {
+            hasUpdate,
+            currentVersion: CURRENT_APP_VERSION,
+            latestVersion: electronRes.latestVersion,
+            buildDate: electronRes.buildDate,
+            title: electronRes.title,
+            features: electronRes.releaseNotes ? electronRes.releaseNotes.split('\n').filter(Boolean) : [],
+            checkFailed: false,
+          };
         }
+      } catch (err) {
+        console.warn('Electron IPC update check failed:', err);
       }
-
-      // 2. Web / PWA version check via version.json with cache buster (supports GitHub Pages subpaths)
-      const baseUrl = import.meta.env.BASE_URL || './';
-      const versionPath = baseUrl.endsWith('/') ? `${baseUrl}version.json` : `${baseUrl}/version.json`;
-      const res = await fetch(`${versionPath}?_t=${Date.now()}`, {
-        cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          Pragma: 'no-cache',
-        },
-      });
-
-      if (!res.ok) {
-        throw new Error(`Failed to fetch version.json: ${res.status}`);
-      }
-
-      const info: VersionInfo = await res.json();
-      const hasUpdate = compareSemver(CURRENT_APP_VERSION, info.version) > 0;
-
-      return {
-        hasUpdate,
-        currentVersion: CURRENT_APP_VERSION,
-        latestVersion: info.version,
-        buildDate: info.buildDate,
-        title: info.title,
-        features: info.features || [],
-      };
-    } catch (err) {
-      console.warn('Update check failed:', err);
-      return {
-        hasUpdate: false,
-        currentVersion: CURRENT_APP_VERSION,
-        latestVersion: CURRENT_APP_VERSION,
-        features: [],
-      };
     }
+
+    // 2. Web / Browser / PWA multi-source fetch
+    const baseUrl = import.meta.env.BASE_URL || './';
+    const localVersionPath = baseUrl.endsWith('/') ? `${baseUrl}version.json` : `${baseUrl}/version.json`;
+
+    // Prioritized list of endpoints to check
+    const candidateUrls: string[] = [
+      // Primary: raw GitHub repository (always up to date immediately on git push, has CORS *)
+      'https://raw.githubusercontent.com/lexwd/WorkWiki3/main/public/version.json',
+      // Secondary: GitHub Pages deployment
+      'https://lexwd.github.io/WorkWiki3/version.json',
+      // Tertiary: local / same-host relative path
+      localVersionPath,
+    ];
+
+    let lastError: Error | null = null;
+
+    for (const url of candidateUrls) {
+      try {
+        const fullUrl = url.includes('?') ? `${url}&_t=${Date.now()}` : `${url}?_t=${Date.now()}`;
+        const res = await fetch(fullUrl, {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            Pragma: 'no-cache',
+          },
+        });
+
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+
+        const info: VersionInfo = await res.json();
+        if (!info || !info.version) {
+          throw new Error('Invalid version format received');
+        }
+
+        const hasUpdate = compareSemver(CURRENT_APP_VERSION, info.version) > 0;
+
+        return {
+          hasUpdate,
+          currentVersion: CURRENT_APP_VERSION,
+          latestVersion: info.version,
+          buildDate: info.buildDate,
+          title: info.title,
+          features: info.features || [],
+          checkFailed: false,
+        };
+      } catch (err: any) {
+        lastError = err;
+        // Continue trying next candidate
+      }
+    }
+
+    console.warn('All update sources failed:', lastError);
+    return {
+      hasUpdate: false,
+      currentVersion: CURRENT_APP_VERSION,
+      latestVersion: CURRENT_APP_VERSION,
+      features: [],
+      checkFailed: true,
+      errorMessage: 'Не удалось связаться с сервером обновлений. Проверьте интернет-соединение.',
+    };
   },
 
   /**

@@ -51,8 +51,10 @@ export const UpdateManagerModal: React.FC<UpdateManagerModalProps> = ({
     try {
       const res = await updateManager.checkForUpdates();
       setCheckResult(res);
-      if (!res.hasUpdate) {
-        setStatusMessage('У вас установлена самая актуальная версия QuickReply Desk.');
+      if (res.checkFailed) {
+        setStatusMessage(res.errorMessage || 'Не удалось связаться с сервером обновлений.');
+      } else if (!res.hasUpdate) {
+        setStatusMessage(`У вас установлена самая актуальная версия QuickReply Desk (v${CURRENT_APP_VERSION}).`);
       }
     } catch {
       setStatusMessage('Не удалось связаться с сервером обновлений. Проверьте соединение.');
@@ -170,11 +172,18 @@ export const UpdateManagerModal: React.FC<UpdateManagerModalProps> = ({
                 </button>
               </div>
             </div>
+          ) : checkResult?.checkFailed ? (
+            <div className="p-3.5 rounded-xl bg-amber-950/30 border border-amber-500/30 flex items-center gap-2.5 text-amber-300">
+              <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>
+                {checkResult.errorMessage || 'Не удалось связаться с сервером обновлений. Проверьте соединение с интернетом.'}
+              </span>
+            </div>
           ) : (
             <div className="p-3.5 rounded-xl bg-emerald-950/30 border border-emerald-500/30 flex items-center gap-2.5 text-emerald-300">
               <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
               <span>
-                {statusMessage || 'У вас установлена последняя версия программы. Приложение работает в оптимальном режиме.'}
+                {statusMessage || `У вас установлена последняя версия программы (v${CURRENT_APP_VERSION}). Приложение работает в оптимальном режиме.`}
               </span>
             </div>
           )}

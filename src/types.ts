@@ -248,7 +248,7 @@ export interface ElectronAPI {
   toggleAlwaysOnTop: () => Promise<boolean>;
   getAlwaysOnTop: () => Promise<boolean>;
   getAppVersion: () => Promise<string>;
-  checkForUpdates?: () => Promise<{ hasUpdate: boolean; latestVersion?: string; releaseNotes?: string }>;
+  checkForUpdates?: () => Promise<{ hasUpdate?: boolean; latestVersion?: string; releaseNotes?: string; buildDate?: string; title?: string } | null>;
   applyUpdateAndReload?: () => Promise<void>;
 }
 

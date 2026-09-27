@@ -269,6 +269,61 @@ ipcMain.handle('get-app-version', () => {
   return app.getVersion();
 });
 
+ipcMain.handle('check-for-updates', async () => {
+  const https = require('https');
+  const urls = [
+    'https://raw.githubusercontent.com/lexwd/WorkWiki3/main/public/version.json',
+    'https://lexwd.github.io/WorkWiki3/version.json',
+  ];
+
+  for (const url of urls) {
+    try {
+      const data = await new Promise((resolve, reject) => {
+        const req = https.get(
+          url,
+          {
+            headers: {
+              'User-Agent': 'QuickReplyDesk/2.2.0',
+              'Cache-Control': 'no-cache',
+            },
+          },
+          (res) => {
+            if (res.statusCode < 200 || res.statusCode >= 300) {
+              return reject(new Error(`HTTP ${res.statusCode}`));
+            }
+            let body = '';
+            res.on('data', (chunk) => (body += chunk));
+            res.on('end', () => {
+              try {
+                resolve(JSON.parse(body));
+              } catch (e) {
+                reject(e);
+              }
+            });
+          }
+        );
+        req.on('error', reject);
+        req.setTimeout(6000, () => {
+          req.destroy();
+          reject(new Error('Timeout'));
+        });
+      });
+
+      if (data && data.version) {
+        return {
+          latestVersion: data.version,
+          buildDate: data.buildDate,
+          title: data.title,
+          releaseNotes: (data.features || []).join('\n'),
+        };
+      }
+    } catch (err) {
+      console.warn(`Check update failed from ${url}:`, err.message);
+    }
+  }
+  return null;
+});
+
 ipcMain.handle('apply-update-and-reload', () => {
   if (mainWindow) {
     mainWindow.webContents.reloadIgnoringCache();

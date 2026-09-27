@@ -1,7 +1,7 @@
 {
   "name": "quickreply-desk",
   "productName": "QuickReply Desk",
-  "version": "1.0.0",
+  "version": "2.2.0",
   "description": "Десктопная панель быстрых ответов, плейсхолдеров, таблиц и заметок для операторов поддержки",
   "author": "QuickReply Desk Team",
   "main": "electron/main.cjs",
