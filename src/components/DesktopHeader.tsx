@@ -93,7 +93,7 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({
             <Zap className="w-4 h-4 fill-current" />
           </div>
           <div className="hidden lg:block shrink-0">
-            <h1 className="font-bold text-xs text-slate-100 leading-tight group-hover:text-white transition-colors">QuickReply Desk</h1>
+            <h1 className="font-bold text-xs text-slate-100 leading-tight group-hover:text-white transition-colors">WorkWiki 3</h1>
             <span className="text-[9px] font-mono text-slate-400 block">v{CURRENT_APP_VERSION} • Рабочее место</span>
           </div>
         </button>
@@ -188,7 +188,7 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({
                 ? 'bg-sky-500/20 text-sky-300 border-sky-400 animate-pulse shadow-md ring-1 ring-sky-400/40'
                 : 'border-slate-700/80 bg-slate-800/80 hover:bg-slate-700 text-slate-300'
             }`}
-            title={hasUpdateAvailable ? 'Доступно обновление QuickReply Desk!' : 'Проверка обновлений (без переустановки)'}
+            title={hasUpdateAvailable ? 'Доступно обновление WorkWiki 3!' : 'Проверка обновлений (без переустановки)'}
           >
             <RefreshCw className={`w-3.5 h-3.5 ${hasUpdateAvailable ? 'text-sky-400' : 'text-slate-400'}`} />
             {hasUpdateAvailable ? (
@@ -234,7 +234,7 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({
               type="button"
               onClick={onOpenBackupModal}
               className="flex items-center gap-1 px-2 py-1.5 rounded-lg border border-emerald-500/40 bg-emerald-950/30 hover:bg-emerald-900/40 text-emerald-300 text-xs font-semibold transition-all shrink-0 cursor-pointer shadow-xs active:scale-95"
-              title="Резервное копирование и восстановление (JSON)"
+              title="Резервное копирование и восстановление"
             >
               <HardDrive className="w-3.5 h-3.5 text-emerald-400" />
               <span className="hidden lg:inline">Бэкап</span>

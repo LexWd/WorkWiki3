@@ -1,9 +1,9 @@
 {
-  "name": "quickreply-desk",
-  "productName": "QuickReply Desk",
-  "version": "2.2.0",
-  "description": "Десктопная панель быстрых ответов, плейсхолдеров, таблиц и заметок для операторов поддержки",
-  "author": "QuickReply Desk Team",
+  "name": "workwiki-3",
+  "productName": "WorkWiki 3",
+  "version": "2.3.0",
+  "description": "Десктопная панель быстрых ответов, заметок и базы знаний для операторов поддержки",
+  "author": "WorkWiki Team",
   "main": "electron/main.cjs",
   "private": true,
   "type": "module",
@@ -48,9 +48,9 @@
     "@rollup/rollup-win32-x64-msvc": "^4.63.3"
   },
   "build": {
-    "appId": "com.quickreply.desk",
-    "productName": "QuickReply Desk",
-    "copyright": "Copyright © 2026 QuickReply Desk",
+    "appId": "com.workwiki.desk",
+    "productName": "WorkWiki 3",
+    "copyright": "Copyright © 2026 WorkWiki",
     "directories": {
       "output": "release"
     },
@@ -83,10 +83,10 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "QuickReply Desk"
+      "shortcutName": "WorkWiki 3"
     },
     "portable": {
-      "artifactName": "QuickReply-Desk-Portable-${version}.exe"
+      "artifactName": "WorkWiki-3-Portable-${version}.exe"
     }
   }
 }

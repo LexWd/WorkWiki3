@@ -283,7 +283,7 @@ export const SnippetImportModal: React.FC<SnippetImportModalProps> = ({
             </div>
             <div>
               <h3 className="font-bold text-sm text-slate-100">
-                Импорт коллекции шаблонов (JSON)
+                Импорт коллекции шаблонов
               </h3>
               <p className="text-[11px] text-slate-400">
                 Загрузка файла коллекции быстрых ответов в базу приложения

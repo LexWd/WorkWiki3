@@ -1,7 +1,7 @@
 import { storage } from './storage';
 
-export const CURRENT_APP_VERSION = '2.2.0';
-export const BUILD_DATE = '2026-09-26';
+export const CURRENT_APP_VERSION = '2.3.0';
+export const BUILD_DATE = '2026-09-27';
 
 export interface VersionInfo {
   version: string;

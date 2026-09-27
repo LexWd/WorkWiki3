@@ -322,7 +322,7 @@ export const BackupManagerModal: React.FC<BackupManagerModalProps> = ({
                   Нажмите для выбора файла или перетащите <code className="text-sky-300 font-mono text-xs">.json</code>
                 </div>
                 <div className="text-[11px] text-slate-400 mt-1">
-                  Поддерживаются полные бэкапы QuickReply Desk любой версии
+                  Поддерживаются полные бэкапы WorkWiki 3 любой версии
                 </div>
               </div>
             ) : (
@@ -390,7 +390,7 @@ export const BackupManagerModal: React.FC<BackupManagerModalProps> = ({
                         className="mt-0.5"
                       />
                       <div>
-                        <div className="font-bold text-xs text-slate-200">Заменить всё (Clean Restore)</div>
+                        <div className="font-bold text-xs text-slate-200">Заменить всё (чистая перезапись)</div>
                         <div className="text-[10px] text-slate-400">Полная замена базы на копию из файла</div>
                       </div>
                     </label>
@@ -410,7 +410,7 @@ export const BackupManagerModal: React.FC<BackupManagerModalProps> = ({
                         className="mt-0.5"
                       />
                       <div>
-                        <div className="font-bold text-xs text-slate-200">Объединить (Merge)</div>
+                        <div className="font-bold text-xs text-slate-200">Объединить с текущими данными</div>
                         <div className="text-[10px] text-slate-400">Добавить новые записи, сохранив имеющиеся</div>
                       </div>
                     </label>

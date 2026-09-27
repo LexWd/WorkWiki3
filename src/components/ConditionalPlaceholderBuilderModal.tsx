@@ -340,7 +340,7 @@ export const ConditionalPlaceholderBuilderModal: React.FC<ConditionalPlaceholder
               <div className="space-y-1">
                 <label className="text-emerald-400 font-semibold flex items-center gap-1.5 text-[11px]">
                   <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>Текст, если условие ВЫПОЛНЕНО (True):</span>
+                  <span>Текст, если условие ВЫПОЛНЕНО (Истина):</span>
                 </label>
                 <textarea
                   rows={3}
@@ -354,7 +354,7 @@ export const ConditionalPlaceholderBuilderModal: React.FC<ConditionalPlaceholder
               <div className="space-y-1">
                 <label className="text-amber-400 font-semibold flex items-center gap-1.5 text-[11px]">
                   <AlertCircle className="w-3.5 h-3.5" />
-                  <span>Текст, если условие НЕ ВЫПОЛНЕНО (Иначе / False):</span>
+                  <span>Текст, если условие НЕ ВЫПОЛНЕНО (Иначе / Ложь):</span>
                 </label>
                 <textarea
                   rows={3}
@@ -400,7 +400,7 @@ export const ConditionalPlaceholderBuilderModal: React.FC<ConditionalPlaceholder
                   ? 'bg-emerald-950 text-emerald-300 border border-emerald-700' 
                   : 'bg-amber-950 text-amber-300 border border-amber-700'
               }`}>
-                {evaluation.matched ? 'Сработало: ДА (True)' : 'Сработало: ИНАЧЕ (False)'}
+                {evaluation.matched ? 'Сработало: ДА (Истина)' : 'Сработало: ИНАЧЕ (Ложь)'}
               </span>
             </div>
 

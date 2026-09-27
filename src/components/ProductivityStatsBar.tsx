@@ -58,7 +58,7 @@ export const ProductivityStatsBar: React.FC<ProductivityStatsBarProps> = ({
 
       {/* Right: Version info */}
       <div className="flex items-center gap-2 text-[10.5px] text-slate-400 font-mono shrink-0 pl-2">
-        <span className="hidden sm:inline">QuickReply Desk</span>
+        <span className="hidden sm:inline">WorkWiki 3</span>
         <span className="text-sky-400 font-semibold">v{CURRENT_APP_VERSION}</span>
       </div>
     </div>

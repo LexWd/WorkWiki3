@@ -1,5 +1,5 @@
-// Service Worker for QuickReply Desk (PWA offline caching)
-const CACHE_NAME = 'quickreply-desk-v2-2';
+// Service Worker for WorkWiki 3 (PWA offline caching)
+const CACHE_NAME = 'workwiki-3-v2-3';
 
 const STATIC_ASSETS = [
   './',

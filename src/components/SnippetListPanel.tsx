@@ -380,7 +380,7 @@ export const SnippetListPanel: React.FC<SnippetListPanelProps> = ({
                   ? 'bg-sky-500/20 text-sky-300 border-sky-400/40'
                   : 'bg-slate-800/80 text-slate-400 hover:text-slate-200 border-slate-700/60'
               }`}
-              title={categoryViewMode === 'scroll' ? 'Развернуть все категории сеткой (Wrap Grid)' : 'Свернуть в компактную прокручиваемую ленту'}
+              title={categoryViewMode === 'scroll' ? 'Развернуть все категории сеткой' : 'Свернуть в компактную прокручиваемую ленту'}
             >
               <LayoutGrid className="w-3.5 h-3.5" />
             </button>

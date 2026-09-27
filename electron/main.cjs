@@ -74,7 +74,7 @@ function createWindow() {
     minHeight: 560,
     backgroundColor: '#090d16',
     autoHideMenuBar: true,
-    title: 'QuickReply Desk',
+    title: 'WorkWiki 3',
     icon: fs.existsSync(iconPath) ? iconPath : undefined,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
@@ -146,7 +146,7 @@ function createTray() {
 
   const contextMenu = Menu.buildFromTemplate([
     {
-      label: 'Показать QuickReply Desk',
+      label: 'Показать WorkWiki 3',
       click: () => {
         if (mainWindow) {
           mainWindow.show();
@@ -174,7 +174,7 @@ function createTray() {
     },
   ]);
 
-  tray.setToolTip('QuickReply Desk — Панель быстрых ответов');
+  tray.setToolTip('WorkWiki 3 — Панель быстрых ответов и заметок');
   tray.setContextMenu(contextMenu);
 
   tray.on('double-click', () => {
@@ -201,7 +201,7 @@ app.on('second-instance', () => {
 app.whenReady().then(() => {
   createWindow();
 
-  // Register Global Hotkey to summon / hide QuickReply Desk anywhere in Windows
+  // Register Global Hotkey to summon / hide WorkWiki 3 anywhere in Windows
   try {
     globalShortcut.register('CommandOrControl+Alt+Q', () => {
       if (!mainWindow) return;
@@ -283,7 +283,7 @@ ipcMain.handle('check-for-updates', async () => {
           url,
           {
             headers: {
-              'User-Agent': 'QuickReplyDesk/2.2.0',
+              'User-Agent': 'WorkWiki3/2.3.0',
               'Cache-Control': 'no-cache',
             },
           },

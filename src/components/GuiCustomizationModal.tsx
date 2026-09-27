@@ -313,7 +313,7 @@ export const GuiCustomizationModal: React.FC<GuiCustomizationModalProps> = ({
               }`}
             >
               <FileJson className="w-3.5 h-3.5 text-sky-400" />
-              <span>Коллекции шаблонов (JSON)</span>
+              <span>Коллекции шаблонов</span>
               <span className="text-[10px] opacity-75 font-mono">({availableCategories.length})</span>
             </button>
 
@@ -827,7 +827,7 @@ export const GuiCustomizationModal: React.FC<GuiCustomizationModalProps> = ({
                       </div>
                     </div>
                     <p className="text-[11px] text-slate-400">
-                      Загрузите файл с предпросмотром шаблонов и выбором режима (Merge / Replace).
+                      Загрузите файл с предпросмотром шаблонов и выбором режима (Объединение / Замена).
                     </p>
                     <button
                       type="button"
@@ -894,7 +894,7 @@ export const GuiCustomizationModal: React.FC<GuiCustomizationModalProps> = ({
                 <div className="p-3 rounded-lg border border-slate-800 bg-slate-900/40 text-[11.5px] leading-relaxed text-slate-300">
                   <p className="font-semibold text-slate-100 mb-1 flex items-center gap-1.5">
                     <HardDrive className="w-3.5 h-3.5 text-emerald-400" />
-                    Полная резервная копия системы (All-in-One JSON)
+                    Полная резервная копия системы
                   </p>
                   <p className="text-slate-400">
                     Включает все сущности рабочего пространства: все шаблоны быстрых ответов, базы данных строк Excel,
@@ -939,7 +939,7 @@ export const GuiCustomizationModal: React.FC<GuiCustomizationModalProps> = ({
                     <div>
                       <div className="font-semibold text-xs text-slate-200 flex items-center gap-1.5">
                         <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                        <span>Локальные снимки безопасности (Auto-Backups)</span>
+                        <span>Автоматические снимки безопасности (авто-бэкапы)</span>
                       </div>
                       <p className="text-[11px] text-slate-400">
                         Автоматические точки отката при опасных действиях и сбросе. Хранятся локально в браузере (до 10 снимков).

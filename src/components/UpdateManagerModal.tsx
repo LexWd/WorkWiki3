@@ -54,7 +54,7 @@ export const UpdateManagerModal: React.FC<UpdateManagerModalProps> = ({
       if (res.checkFailed) {
         setStatusMessage(res.errorMessage || 'Не удалось связаться с сервером обновлений.');
       } else if (!res.hasUpdate) {
-        setStatusMessage(`У вас установлена самая актуальная версия QuickReply Desk (v${CURRENT_APP_VERSION}).`);
+        setStatusMessage(`У вас установлена самая актуальная версия WorkWiki 3 (v${CURRENT_APP_VERSION}).`);
       }
     } catch {
       setStatusMessage('Не удалось связаться с сервером обновлений. Проверьте соединение.');

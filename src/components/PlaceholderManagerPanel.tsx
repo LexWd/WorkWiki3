@@ -154,9 +154,9 @@ export const PlaceholderManagerPanel: React.FC<PlaceholderManagerPanelProps> = (
             <Brackets className="w-4 h-4" />
           </div>
           <div>
-            <h2 className="font-bold text-sm text-slate-100">База данных плейсхолдеров (Placeholder Customization)</h2>
+            <h2 className="font-bold text-sm text-slate-100">База данных плейсхолдеров</h2>
             <p className="text-[11px] text-slate-400">
-              Стандартные данные, множественный выбор (Multiple choice) и привязка к колонкам Excel
+              Стандартные данные, списки выбора и привязка к колонкам таблицы
             </p>
           </div>
         </div>
@@ -166,10 +166,10 @@ export const PlaceholderManagerPanel: React.FC<PlaceholderManagerPanelProps> = (
             type="button"
             onClick={() => setIsConditionalBuilderOpen(true)}
             className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold text-white bg-purple-600 hover:bg-purple-500 shadow-sm cursor-pointer transition-colors"
-            title="Интерактивный конструктор логических условий (If/Else)"
+            title="Интерактивный конструктор логических условий (Если / Иначе)"
           >
             <Sparkles className="w-3.5 h-3.5" />
-            <span>Конструктор условий (If/Else)</span>
+            <span>Конструктор условий (Если / Иначе)</span>
           </button>
 
           <button

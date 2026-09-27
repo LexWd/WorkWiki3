@@ -44,10 +44,10 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
         type="button"
         onClick={handleInstallClick}
         className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-sky-500/50 bg-sky-950/40 hover:bg-sky-900/60 text-sky-300 text-xs font-semibold shadow-sm transition-all hover:scale-102 active:scale-98 cursor-pointer ${className}`}
-        title="Установить QuickReply Desk как отдельное приложение (PWA)"
+        title="Установить WorkWiki 3 как отдельное приложение"
       >
         <Download className="w-3.5 h-3.5 text-sky-400 animate-bounce" />
-        <span>{variant === 'full' ? 'Установить приложение' : 'Установить PWA'}</span>
+        <span>{variant === 'full' ? 'Установить приложение' : 'Установить приложение'}</span>
       </button>
     );
   }
@@ -59,7 +59,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
         <button
           type="button"
           onClick={() => setShowIOSGuide(true)}
-          className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-colors cursor-pointer ${className}`}
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-colors cursor-pointer ${className}`}
           title="Инструкция по установке на iPhone/iPad"
         >
           <Smartphone className="w-3.5 h-3.5 text-sky-400" />
@@ -83,9 +83,9 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
                 </button>
               </div>
               <p className="mt-3 text-xs text-slate-300 leading-relaxed">
-                1. Нажмите кнопку <strong>«Поделиться» (Share)</strong> в нижней панели Safari.<br />
-                2. Пролистайте вниз и выберите <strong>«На экран "Домой"» (Add to Home Screen)</strong>.<br />
-                3. Приложение появится среди ваших иконок и будет работать офлайн.
+                1. Нажмите кнопку <strong>«Поделиться»</strong> в нижней панели Safari.<br />
+                2. Пролистайте вниз и выберите <strong>«На экран "Домой"»</strong>.<br />
+                3. Приложение появится среди ваших иконок и будет работать автономно.
               </p>
               <button
                 type="button"

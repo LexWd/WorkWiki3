@@ -500,7 +500,7 @@ export const storage = {
     if (!hasSnippets && !hasTables && !hasPlaceholders && !hasNotes && !hasWidgets) {
       return {
         isValid: false,
-        error: 'В файле не обнаружены данные QuickReply Desk (нет шаблонов, заметок или таблиц)',
+        error: 'В файле не обнаружены данные WorkWiki 3 (нет шаблонов, заметок или ссылок)',
       };
     }
 

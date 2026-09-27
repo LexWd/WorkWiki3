@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "QuickReply Desk",
-  "short_name": "QuickReply",
-  "description": "Рабочее место оператора поддержки: быстрые ответы, плейсхолдеры, таблицы и история",
+  "name": "WorkWiki 3",
+  "short_name": "WorkWiki 3",
+  "description": "Рабочее место оператора: быстрые ответы, шаблоны, заметки и база знаний",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
