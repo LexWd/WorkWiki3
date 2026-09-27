@@ -3,7 +3,6 @@ import {
   RefreshCw, 
   Sparkles, 
   CheckCircle2, 
-  DownloadCloud, 
   AlertCircle, 
   X, 
   ShieldCheck, 
@@ -11,14 +10,14 @@ import {
   ExternalLink,
   Laptop,
   Globe,
-  FolderOpen,
-  Play,
-  FileDown
+  Zap,
+  DownloadCloud
 } from 'lucide-react';
 import { GuiSettings } from '../types';
 import { getThemeClasses, getAccentClasses } from '../utils/theme';
 import { updateManager, CURRENT_APP_VERSION, BUILD_DATE, UpdateCheckResult } from '../utils/updateManager';
 import { soundService } from '../utils/sound';
+import { storage } from '../utils/storage';
 
 interface UpdateManagerModalProps {
   isOpen: boolean;
@@ -45,12 +44,10 @@ export const UpdateManagerModal: React.FC<UpdateManagerModalProps> = ({
   const [updatePhase, setUpdatePhase] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
-  // Desktop .exe download state
-  const [isDownloadingExe, setIsDownloadingExe] = useState(false);
+  // Desktop .exe 1-Click download and install state
+  const [isUpdatingOneClick, setIsUpdatingOneClick] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
   const [downloadProgressText, setDownloadProgressText] = useState<string>('');
-  const [downloadedExePath, setDownloadedExePath] = useState<string | null>(null);
-  const [downloadedExeName, setDownloadedExeName] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
 
   const isElectron = updateManager.isElectronApp();
@@ -114,38 +111,42 @@ export const UpdateManagerModal: React.FC<UpdateManagerModalProps> = ({
     await updateManager.applyUpdateAndReload(checkResult?.latestVersion);
   };
 
-  // Desktop .exe direct download inside the app or browser
-  const handleDownloadExe = async () => {
+  // Desktop .exe 1-Click Update: Closes old version, updates silently via Setup, and automatically opens new version
+  const handleOneClickDesktopUpdate = async () => {
     if (!checkResult) return;
     soundService.playClick(settings.soundEffects);
     setDownloadError(null);
 
     // If running inside desktop Electron app
     if (isElectron && window.electronAPI?.downloadUpdateExe) {
-      setIsDownloadingExe(true);
+      setIsUpdatingOneClick(true);
       setDownloadProgress(0);
-      setDownloadProgressText('Подготовка к загрузке...');
+      setDownloadProgressText('Подготовка к загрузке установщика...');
 
-      const targetFileName = `WorkWiki-3-Portable-${checkResult.latestVersion}.exe`;
-      // Determine download URL (direct exeUrl from GitHub Release, or construct raw/releases asset)
+      // Save a local safety backup before updating
+      try {
+        storage.createAutoBackup(`Резервная копия перед обновлением до v${checkResult.latestVersion}`);
+      } catch {}
+
+      const targetFileName = `WorkWiki-3-Setup-${checkResult.latestVersion}.exe`;
       const downloadTargetUrl =
         checkResult.exeUrl ||
         `https://github.com/lexwd/WorkWiki3/releases/download/v${checkResult.latestVersion}/${targetFileName}`;
 
       const res = await updateManager.downloadExeUpdate(downloadTargetUrl, targetFileName);
 
-      setIsDownloadingExe(false);
-
       if (res.success && res.filePath) {
+        setDownloadProgress(100);
+        setDownloadProgressText('Установка обновления и перезапуск приложения...');
         soundService.playSuccess(settings.soundEffects);
-        setDownloadedExePath(res.filePath);
-        setDownloadedExeName(res.fileName || targetFileName);
-        if (onToast) {
-          onToast('Файл скачан', `Файл ${res.fileName} готов к запуску в папке Загрузки.`);
-        }
+
+        // Allow user to see 100% and restart status before app closes
+        setTimeout(async () => {
+          await updateManager.installUpdateAndRestart(res.filePath!);
+        }, 700);
       } else {
-        setDownloadError(res.error || 'Не удалось скачать файл напрямую. Открываем страницу загрузки...');
-        // Fallback to opening external link
+        setIsUpdatingOneClick(false);
+        setDownloadError(res.error || 'Не удалось скачать файл установщика. Открываем страницу загрузки...');
         updateManager.openExternalUrl(checkResult.downloadUrl || updateManager.getReleasesUrl());
       }
     } else {
@@ -153,23 +154,9 @@ export const UpdateManagerModal: React.FC<UpdateManagerModalProps> = ({
       const url = checkResult.exeUrl || checkResult.downloadUrl || updateManager.getReleasesUrl();
       updateManager.openExternalUrl(url);
       if (onToast) {
-        onToast('Загрузка EXE', 'Начато скачивание файла через браузер.');
+        onToast('Загрузка Setup', 'Начато скачивание установщика через браузер.');
       }
     }
-  };
-
-  const handleLaunchDownloadedExe = async () => {
-    if (!downloadedExePath) return;
-    soundService.playSuccess(settings.soundEffects);
-    const launched = await updateManager.installExeUpdate(downloadedExePath);
-    if (!launched) {
-      await updateManager.openDownloadedFolder(downloadedExePath);
-    }
-  };
-
-  const handleOpenDownloadedFolder = async () => {
-    soundService.playClick(settings.soundEffects);
-    await updateManager.openDownloadedFolder(downloadedExePath || undefined);
   };
 
   const handleOpenReleases = () => {
@@ -201,11 +188,13 @@ export const UpdateManagerModal: React.FC<UpdateManagerModalProps> = ({
                     : 'bg-emerald-950/40 text-emerald-300 border-emerald-800/60'
                 }`}>
                   {isElectron ? <Laptop className="w-3 h-3" /> : <Globe className="w-3 h-3" />}
-                  {isElectron ? 'Windows EXE' : 'Веб / PWA'}
+                  {isElectron ? 'Windows Setup' : 'Веб / PWA'}
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
-                Безопасное обновление с сохранением всех шаблонов и настроек
+                {isElectron 
+                  ? 'Автоматическое обновление в 1 клик без диалоговых окон' 
+                  : 'Безопасное обновление с сохранением всех шаблонов и настроек'}
               </p>
             </div>
           </div>
@@ -231,14 +220,14 @@ export const UpdateManagerModal: React.FC<UpdateManagerModalProps> = ({
               </div>
               <p className="text-[11px] text-slate-400">
                 {isElectron 
-                  ? 'Запущено десктопное приложение Windows (.exe)' 
+                  ? 'Установлено настольное приложение Windows (Setup)' 
                   : 'Запущена веб-версия (синхронизация с браузером)'}
               </p>
             </div>
 
             <button
               type="button"
-              disabled={checking || isUpdating || isDownloadingExe}
+              disabled={checking || isUpdating || isUpdatingOneClick}
               onClick={handleCheckForUpdates}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-lg font-semibold text-xs border border-slate-700 hover:border-slate-600 bg-slate-800 hover:bg-slate-700 text-slate-200 transition-all cursor-pointer disabled:opacity-50 shrink-0`}
             >
@@ -265,7 +254,7 @@ export const UpdateManagerModal: React.FC<UpdateManagerModalProps> = ({
                   </div>
                   <p className="text-xs text-sky-300/80 mt-1">
                     {isElectron
-                      ? 'Для Windows доступен обновленный исполняемый файл (.exe).'
+                      ? 'Обновление установится в 1 клик: старая версия закроется, обновится и откроется сама.'
                       : 'Обновление веб-версии применяется мгновенно в один клик без потери данных.'}
                   </p>
                 </div>
@@ -288,22 +277,27 @@ export const UpdateManagerModal: React.FC<UpdateManagerModalProps> = ({
                 </div>
               )}
 
-              {/* Download Progress Bar (When downloading .exe) */}
-              {isDownloadingExe && (
-                <div className="p-3 rounded-xl bg-slate-900/90 border border-sky-500/50 space-y-2">
+              {/* Download & Installation Progress Bar (1-Click Update) */}
+              {isUpdatingOneClick && (
+                <div className="p-3.5 rounded-xl bg-slate-900/90 border border-sky-500/50 space-y-2">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="font-semibold text-sky-300 flex items-center gap-1.5">
-                      <DownloadCloud className="w-4 h-4 animate-bounce text-sky-400" />
-                      Загрузка Windows EXE...
+                    <span className="font-semibold text-sky-300 flex items-center gap-2">
+                      <RefreshCw className="w-4 h-4 animate-spin text-sky-400" />
+                      {downloadProgressText || 'Загрузка установщика...'}
                     </span>
-                    <span className="font-mono text-sky-200">{downloadProgressText}</span>
+                    <span className="font-mono text-sky-200 font-bold">
+                      {downloadProgress !== null ? `${downloadProgress}%` : ''}
+                    </span>
                   </div>
-                  <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                  <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden">
                     <div 
-                      className="h-full bg-gradient-to-r from-sky-500 to-indigo-500 transition-all duration-150"
+                      className="h-full bg-gradient-to-r from-sky-500 via-indigo-500 to-emerald-400 transition-all duration-150"
                       style={{ width: `${downloadProgress || 0}%` }}
                     />
                   </div>
+                  <p className="text-[10.5px] text-slate-400">
+                    Не закрывайте окно: после завершения загрузки программа автоматически перезапустится с обновлением.
+                  </p>
                 </div>
               )}
 
@@ -312,37 +306,6 @@ export const UpdateManagerModal: React.FC<UpdateManagerModalProps> = ({
                 <div className="p-2.5 rounded-lg bg-rose-950/40 border border-rose-500/40 text-rose-300 text-xs flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
                   <span>{downloadError}</span>
-                </div>
-              )}
-
-              {/* Downloaded Successfully Card */}
-              {downloadedExePath && (
-                <div className="p-3.5 rounded-xl bg-emerald-950/40 border border-emerald-500/50 space-y-2.5">
-                  <div className="flex items-center gap-2 text-emerald-300 font-semibold">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                    <span>Файл обновления успешно скачан!</span>
-                  </div>
-                  <p className="text-[11.5px] text-slate-300 font-mono break-all bg-black/40 p-2 rounded border border-emerald-900/60">
-                    {downloadedExeName}
-                  </p>
-                  <div className="flex items-center gap-2 pt-1 flex-wrap">
-                    <button
-                      type="button"
-                      onClick={handleLaunchDownloadedExe}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg font-bold text-xs bg-emerald-600 hover:bg-emerald-500 text-white shadow transition-colors cursor-pointer"
-                    >
-                      <Play className="w-3.5 h-3.5" />
-                      <span>Запустить новую версию сейчас</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleOpenDownloadedFolder}
-                      className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg font-semibold text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors cursor-pointer"
-                    >
-                      <FolderOpen className="w-3.5 h-3.5 text-sky-400" />
-                      <span>Показать в Загрузках</span>
-                    </button>
-                  </div>
                 </div>
               )}
 
@@ -355,27 +318,25 @@ export const UpdateManagerModal: React.FC<UpdateManagerModalProps> = ({
               )}
 
               {/* Action buttons */}
-              {!downloadedExePath && (
+              {!isUpdatingOneClick && !isUpdating && (
                 <div className="space-y-2 pt-1">
                   {/* Primary Action Button */}
                   {isElectron ? (
                     <div className="flex flex-col sm:flex-row items-center gap-2">
                       <button
                         type="button"
-                        disabled={isDownloadingExe}
-                        onClick={handleDownloadExe}
-                        className={`w-full sm:flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl font-bold text-xs text-white shadow-lg transition-all cursor-pointer ${accent.primary} hover:opacity-95 disabled:opacity-60`}
+                        onClick={handleOneClickDesktopUpdate}
+                        className={`w-full sm:flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl font-bold text-xs text-white shadow-lg transition-all cursor-pointer ${accent.primary} hover:opacity-95`}
                       >
-                        <FileDown className={`w-4 h-4 ${isDownloadingExe ? 'animate-bounce' : ''}`} />
-                        <span>
-                          {isDownloadingExe ? 'Скачивание обновления...' : `Скачать обновление Windows EXE (.exe)`}
-                        </span>
+                        <Zap className="w-4 h-4 text-amber-300 fill-amber-300" />
+                        <span>Обновить и перезапустить в 1 клик</span>
                       </button>
 
                       <button
                         type="button"
                         onClick={handleOpenReleases}
                         className="w-full sm:w-auto flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl font-semibold text-xs text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-colors cursor-pointer shrink-0"
+                        title="Открыть страницу релизов на GitHub"
                       >
                         <ExternalLink className="w-3.5 h-3.5 text-sky-400" />
                         <span>GitHub Релизы</span>
@@ -395,27 +356,12 @@ export const UpdateManagerModal: React.FC<UpdateManagerModalProps> = ({
 
                       <button
                         type="button"
-                        onClick={handleDownloadExe}
+                        onClick={handleOneClickDesktopUpdate}
                         className="w-full sm:w-auto flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl font-semibold text-xs text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-colors cursor-pointer shrink-0"
-                        title="Скачать нативную версию для Windows"
+                        title="Скачать установщик для Windows"
                       >
-                        <Laptop className="w-3.5 h-3.5 text-purple-400" />
-                        <span>Скачать .EXE</span>
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Secondary option to hard reload desktop cache */}
-                  {isElectron && (
-                    <div className="pt-1 flex items-center justify-between">
-                      <button
-                        type="button"
-                        disabled={isUpdating}
-                        onClick={handleApplyWebUpdate}
-                        className="text-[11px] text-slate-400 hover:text-slate-200 underline underline-offset-2 cursor-pointer flex items-center gap-1"
-                      >
-                        <RefreshCw className="w-3 h-3" />
-                        <span>Перезагрузить окно с очисткой кэша</span>
+                        <DownloadCloud className="w-3.5 h-3.5 text-sky-400" />
+                        <span>Скачать Setup (.exe)</span>
                       </button>
                     </div>
                   )}

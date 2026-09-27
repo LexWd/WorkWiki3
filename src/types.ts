@@ -263,6 +263,7 @@ export interface ElectronAPI {
   openExternalUrl?: (url: string) => Promise<boolean>;
   downloadUpdateExe?: (opts: { url: string; fileName?: string }) => Promise<{ success: boolean; filePath?: string; fileName?: string; error?: string }>;
   installUpdateExe?: (filePath: string) => Promise<boolean>;
+  installUpdateAndRestart?: (installerPath: string) => Promise<boolean>;
   openDownloadedFolder?: (filePath: string) => Promise<boolean>;
   onDownloadProgress?: (callback: (progress: { received: number; total: number; percent: number }) => void) => () => void;
 }

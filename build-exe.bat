@@ -1,10 +1,10 @@
 @echo off
 chcp 65001 >nul
-title WorkWiki 3 — Сборка Windows EXE
+title WorkWiki 3 — Сборка Setup инсталлятора Windows
 cls
 
 echo ====================================================================
-echo             WorkWiki 3 — Сборка EXE для Windows
+echo             WorkWiki 3 — Сборка Setup EXE для Windows
 echo ====================================================================
 echo.
 
@@ -31,7 +31,7 @@ if %errorlevel% neq 0 (
 )
 
 echo.
-echo [2/3] Компиляция приложения и упаковка в Windows EXE (Portable + Setup)...
+echo [2/3] Компиляция приложения и упаковка в Setup инсталлятор (1-Click Update)...
 call npm run electron:build:win
 if %errorlevel% neq 0 (
     echo.
@@ -43,18 +43,17 @@ if %errorlevel% neq 0 (
 echo.
 echo [3/3] Сборка успешно завершена!
 echo.
-echo Файлы готовы в папке "release":
-echo   1. WorkWiki-3-Portable-2.3.0.exe  (Один автономный файл, запуск без установки)
-echo   2. WorkWiki 3 Setup 2.3.0.exe     (Классический инсталлятор с ярлыками)
+echo Готовый файл в папке "release":
+echo   -> WorkWiki-3-Setup-2.3.1.exe (Автоматический установщик с поддержкой 1-клик обновлений)
 echo.
-echo Открываем папку с готовыми файлами...
+echo Открываем папку с готовым файлом...
 start "" "release"
 
 echo.
-set /p runNow="Запустить Portable EXE прямо сейчас? (Y/N, по умолчанию Y): "
+set /p runNow="Запустить установщик прямо сейчас? (Y/N, по умолчанию Y): "
 if /i "%runNow%"=="" set runNow=Y
 if /i "%runNow%"=="Y" (
-    for %%F in (release\WorkWiki-3-Portable-*.exe release\WorkWiki*.exe) do (
+    for %%F in (release\WorkWiki-3-Setup-*.exe release\WorkWiki*.exe) do (
         echo Запуск %%F...
         start "" "%%F"
         goto end

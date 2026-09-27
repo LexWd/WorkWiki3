@@ -319,8 +319,22 @@ export const updateManager = {
    * Launches newly downloaded .exe and closes the current application
    */
   async installExeUpdate(filePath: string): Promise<boolean> {
-    if (typeof window !== 'undefined' && window.electronAPI?.installUpdateExe) {
+    if (typeof window !== 'undefined' && window.electronAPI?.installUpdateAndRestart) {
+      return await window.electronAPI.installUpdateAndRestart(filePath);
+    } else if (typeof window !== 'undefined' && window.electronAPI?.installUpdateExe) {
       return await window.electronAPI.installUpdateExe(filePath);
+    }
+    return false;
+  },
+
+  /**
+   * 1-Click Update and Restart: closes current app, runs Setup silently (/S), and automatically relaunches new version
+   */
+  async installUpdateAndRestart(installerPath: string): Promise<boolean> {
+    if (typeof window !== 'undefined' && window.electronAPI?.installUpdateAndRestart) {
+      return await window.electronAPI.installUpdateAndRestart(installerPath);
+    } else if (typeof window !== 'undefined' && window.electronAPI?.installUpdateExe) {
+      return await window.electronAPI.installUpdateExe(installerPath);
     }
     return false;
   },

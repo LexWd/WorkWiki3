@@ -1,7 +1,7 @@
 {
   "name": "workwiki-3",
   "productName": "WorkWiki 3",
-  "version": "2.3.0",
+  "version": "2.3.1",
   "description": "Десктопная панель быстрых ответов, заметок и базы знаний для операторов поддержки",
   "author": "WorkWiki Team",
   "main": "electron/main.cjs",
@@ -15,8 +15,8 @@
     "lint": "tsc --noEmit",
     "electron:dev": "electron .",
     "electron:pack": "vite build && electron-builder --dir",
-    "electron:build:win": "vite build && electron-builder --win portable nsis",
-    "electron:build:portable": "vite build && electron-builder --win portable",
+    "electron:build:win": "vite build && electron-builder --win nsis",
+    "electron:build:setup": "vite build && electron-builder --win nsis",
     "build:exe": "npm run electron:build:win"
   },
   "dependencies": {
@@ -64,12 +64,6 @@
     "win": {
       "target": [
         {
-          "target": "portable",
-          "arch": [
-            "x64"
-          ]
-        },
-        {
           "target": "nsis",
           "arch": [
             "x64"
@@ -79,14 +73,15 @@
       "icon": "electron/icons/icon.ico"
     },
     "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
+      "oneClick": true,
+      "perMachine": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": false,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "WorkWiki 3"
-    },
-    "portable": {
-      "artifactName": "WorkWiki-3-Portable-${version}.exe"
+      "shortcutName": "WorkWiki 3",
+      "artifactName": "WorkWiki-3-Setup-${version}.exe",
+      "runAfterFinish": true
     }
   }
 }

@@ -360,7 +360,7 @@ ipcMain.handle('check-for-updates', async () => {
 ipcMain.handle('download-update-exe', async (_event, { url, fileName }) => {
   const https = require('https');
   const http = require('http');
-  const targetFileName = fileName || `WorkWiki-3-Portable-${Date.now()}.exe`;
+  const targetFileName = fileName || `WorkWiki-3-Setup-${Date.now()}.exe`;
   const downloadsDir = app.getPath('downloads');
   const destPath = path.join(downloadsDir, targetFileName);
 
@@ -375,7 +375,7 @@ ipcMain.handle('download-update-exe', async (_event, { url, fileName }) => {
         targetUrl,
         {
           headers: {
-            'User-Agent': `WorkWiki3/${app.getVersion() || '2.3.0'}`,
+            'User-Agent': `WorkWiki3/${app.getVersion() || '2.3.1'}`,
             Accept: '*/*',
           },
         },
@@ -435,36 +435,70 @@ ipcMain.handle('download-update-exe', async (_event, { url, fileName }) => {
   }
 });
 
-// Launch newly downloaded .exe and safely quit running app
-ipcMain.handle('install-update-exe', async (_event, filePath) => {
-  if (!filePath || !fs.existsSync(filePath)) {
+// 1-Click Update and Restart: closes current app, runs Setup silently (/S), and automatically relaunches new version
+async function executeSilentInstallAndRestart(installerPath) {
+  if (!installerPath || !fs.existsSync(installerPath)) {
     return false;
   }
 
   const { spawn } = require('child_process');
   try {
-    // Spawn detached process
-    const child = spawn(filePath, [], {
+    const tempDir = app.getPath('temp');
+    const updaterBatPath = path.join(tempDir, `workwiki-update-${Date.now()}.cmd`);
+
+    const defaultInstallExe = path.join(process.env.LOCALAPPDATA || '', 'Programs', 'workwiki-3', 'WorkWiki 3.exe');
+    const targetExe = fs.existsSync(defaultInstallExe) ? defaultInstallExe : (app.isPackaged ? process.execPath : defaultInstallExe);
+
+    const batContent = [
+      '@echo off',
+      'chcp 65001 >nul',
+      'timeout /t 2 /nobreak >nul',
+      `start /wait "" "${installerPath}" /S`,
+      'timeout /t 1 /nobreak >nul',
+      `if exist "${defaultInstallExe}" (`,
+      `    start "" "${defaultInstallExe}"`,
+      ') else (',
+      `    start "" "${targetExe}"`,
+      ')',
+      '(goto) 2>nul & del "%~f0"',
+    ].join('\r\n');
+
+    fs.writeFileSync(updaterBatPath, batContent, 'utf8');
+
+    const child = spawn('cmd.exe', ['/c', updaterBatPath], {
       detached: true,
       stdio: 'ignore',
+      windowsHide: true,
     });
     child.unref();
 
-    // Safely exit current instance after short delay so new instance can acquire lock
     setTimeout(() => {
       isQuitting = true;
       app.quit();
-    }, 600);
+    }, 400);
+
     return true;
   } catch (err) {
-    console.error('Failed to spawn new exe:', err);
+    console.error('Failed to execute 1-click update:', err);
     try {
-      shell.openPath(filePath);
+      shell.openPath(installerPath);
+      setTimeout(() => {
+        isQuitting = true;
+        app.quit();
+      }, 500);
       return true;
     } catch {
       return false;
     }
   }
+}
+
+ipcMain.handle('install-update-and-restart', async (_event, installerPath) => {
+  return await executeSilentInstallAndRestart(installerPath);
+});
+
+ipcMain.handle('install-update-exe', async (_event, filePath) => {
+  return await executeSilentInstallAndRestart(filePath);
 });
 
 ipcMain.handle('open-downloaded-folder', (_event, filePath) => {

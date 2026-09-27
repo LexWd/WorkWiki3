@@ -1,8 +1,8 @@
-# WorkWiki 3 - PowerShell build script
+# WorkWiki 3 - PowerShell build script (Setup version)
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
 Write-Host "====================================================================" -ForegroundColor Cyan
-Write-Host "         WorkWiki 3 — Автоматическая сборка Windows EXE             " -ForegroundColor Yellow
+Write-Host "         WorkWiki 3 — Автоматическая сборка Setup Windows EXE       " -ForegroundColor Yellow
 Write-Host "====================================================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -22,7 +22,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host ""
-Write-Host "[2/3] Компиляция приложения и упаковка в EXE..." -ForegroundColor Green
+Write-Host "[2/3] Компиляция приложения и упаковка в Setup EXE..." -ForegroundColor Green
 npm run electron:build:win
 if ($LASTEXITCODE -ne 0) {
     Write-Host "[ОШИБКА] Сбой при сборке electron-builder!" -ForegroundColor Red
@@ -31,7 +31,7 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host ""
 Write-Host "[3/3] Сборка успешно завершена!" -ForegroundColor Green
-Write-Host "Готовые файлы расположены в папке release/:" -ForegroundColor Cyan
+Write-Host "Готовый файл расположен в папке release/:" -ForegroundColor Cyan
 Get-ChildItem -Path "release" -Filter "*.exe" | ForEach-Object {
     $sizeMB = [math]::Round($_.Length / 1MB, 2)
     Write-Host "  -> $($_.Name) ($sizeMB MB)" -ForegroundColor Yellow
@@ -39,13 +39,13 @@ Get-ChildItem -Path "release" -Filter "*.exe" | ForEach-Object {
 
 Invoke-Item "release"
 
-$response = Read-Host "Запустить WorkWiki-3-Portable прямо сейчас? (Y/n)"
+$response = Read-Host "Запустить WorkWiki-3-Setup прямо сейчас? (Y/n)"
 if ($response -eq "" -or $response -match "^[yYдД]") {
-    $portable = Get-ChildItem -Path "release" -Filter "WorkWiki-3-Portable-*.exe" | Select-Object -First 1
-    if (-not $portable) {
-        $portable = Get-ChildItem -Path "release" -Filter "WorkWiki*.exe" | Select-Object -First 1
+    $setup = Get-ChildItem -Path "release" -Filter "WorkWiki-3-Setup-*.exe" | Select-Object -First 1
+    if (-not $setup) {
+        $setup = Get-ChildItem -Path "release" -Filter "*.exe" | Select-Object -First 1
     }
-    if ($portable) {
-        Start-Process $portable.FullName
+    if ($setup) {
+        Start-Process $setup.FullName
     }
 }
