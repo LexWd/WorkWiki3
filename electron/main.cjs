@@ -324,6 +324,20 @@ ipcMain.handle('check-for-updates', async () => {
   return null;
 });
 
+ipcMain.handle('clipboard-write-text', (_event, text) => {
+  const { clipboard } = require('electron');
+  clipboard.writeText(text || '');
+  return true;
+});
+
+ipcMain.handle('open-external-url', (_event, url) => {
+  if (url && typeof url === 'string') {
+    shell.openExternal(url);
+    return true;
+  }
+  return false;
+});
+
 ipcMain.handle('apply-update-and-reload', () => {
   if (mainWindow) {
     mainWindow.webContents.reloadIgnoringCache();

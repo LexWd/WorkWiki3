@@ -200,6 +200,20 @@ export const LiveComposerAndResolver: React.FC<LiveComposerAndResolverProps> = (
     setTimeout(() => setCopied(false), 2000);
   };
 
+  // Global shortcut inside component: Ctrl+Enter to copy answer from anywhere in the resolver
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        if (resolvedText.trim()) {
+          e.preventDefault();
+          handleCopy();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [resolvedText, selectedSnippet, onCopyResolved]);
+
   const handleSetOverride = (tokenKey: string, value: string, playSound = false) => {
     setTokenOverrides((prev) => ({ ...prev, [tokenKey]: value }));
     if (playSound) {

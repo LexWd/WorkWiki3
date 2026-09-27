@@ -129,7 +129,8 @@ export type WidgetIconType =
   | 'sparkles' 
   | 'search' 
   | 'database' 
-  | 'layers';
+  | 'layers'
+  | (string & {});
 
 export interface ResourceWidget {
   id: string;
@@ -250,6 +251,8 @@ export interface ElectronAPI {
   getAppVersion: () => Promise<string>;
   checkForUpdates?: () => Promise<{ hasUpdate?: boolean; latestVersion?: string; releaseNotes?: string; buildDate?: string; title?: string } | null>;
   applyUpdateAndReload?: () => Promise<void>;
+  copyToClipboard?: (text: string) => Promise<boolean>;
+  openExternalUrl?: (url: string) => Promise<boolean>;
 }
 
 declare global {

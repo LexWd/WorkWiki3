@@ -17,12 +17,20 @@ import { PlaceholderConfig, GuiSettings } from '../types';
 import { getThemeClasses, getAccentClasses } from '../utils/theme';
 import { soundService } from '../utils/sound';
 import { evaluateCondition } from '../utils/interpolator';
+import { copyToClipboard } from '../utils/clipboard';
 
 interface ConditionalPlaceholderBuilderModalProps {
   isOpen: boolean;
   onClose: () => void;
   placeholders: PlaceholderConfig[];
   onInsertSnippet?: (conditionalSyntax: string) => void;
+  onApplyToField?: (conditionalSyntax: string) => void;
+  onSaveAsPlaceholder?: (data: {
+    key: string;
+    label: string;
+    description: string;
+    defaultValue: string;
+  }) => void;
   settings: GuiSettings;
 }
 
@@ -87,6 +95,8 @@ export const ConditionalPlaceholderBuilderModal: React.FC<ConditionalPlaceholder
   onClose,
   placeholders,
   onInsertSnippet,
+  onApplyToField,
+  onSaveAsPlaceholder,
   settings,
 }) => {
   const [selectedVariable, setSelectedVariable] = useState<string>(() => {
@@ -153,8 +163,8 @@ export const ConditionalPlaceholderBuilderModal: React.FC<ConditionalPlaceholder
 
   const simulatedOutput = evaluation.matched ? ifTrueText : ifFalseText;
 
-  const handleCopyCode = () => {
-    navigator.clipboard.writeText(fullSyntax);
+  const handleCopyCode = async () => {
+    await copyToClipboard(fullSyntax);
     soundService.playCopyChime(settings.soundEffects);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -446,7 +456,7 @@ export const ConditionalPlaceholderBuilderModal: React.FC<ConditionalPlaceholder
             Отмена
           </button>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={handleCopyCode}
@@ -455,6 +465,40 @@ export const ConditionalPlaceholderBuilderModal: React.FC<ConditionalPlaceholder
               {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
               <span>Скопировать код</span>
             </button>
+
+            {onApplyToField && (
+              <button
+                type="button"
+                onClick={() => {
+                  onApplyToField(fullSyntax);
+                  soundService.playSuccess(settings.soundEffects);
+                  onClose();
+                }}
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold text-white shadow-md cursor-pointer ${accent.primary}`}
+              >
+                <Check className="w-4 h-4" />
+                <span>Применить в поле плейсхолдера</span>
+              </button>
+            )}
+
+            {onSaveAsPlaceholder && (
+              <button
+                type="button"
+                onClick={() => {
+                  const safeKey = `условие_${activeVariableKey.replace(/[^a-zA-Zа-яА-ЯёЁ0-9_]/g, '_').toLowerCase()}`;
+                  onSaveAsPlaceholder({
+                    key: safeKey,
+                    label: `Условие: ${activeVariableKey}`,
+                    description: `Динамическое условие на основе «${activeVariableKey}»`,
+                    defaultValue: fullSyntax,
+                  });
+                }}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold text-white shadow-md cursor-pointer bg-purple-600 hover:bg-purple-500 transition-colors"
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>Создать плейсхолдер с условием</span>
+              </button>
+            )}
 
             {onInsertSnippet && (
               <button

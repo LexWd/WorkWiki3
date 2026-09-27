@@ -3,6 +3,7 @@
   "buildDate": "2026-09-27",
   "minCompatibleVersion": "1.0.0",
   "title": "WorkWiki 3 v2.3.0",
+  "downloadUrl": "https://github.com/lexwd/WorkWiki3/releases",
   "features": [
     "Обновлено официальное название приложения: WorkWiki 3",
     "Удалены англоязычные термины и технические подсказки в интерфейсе",

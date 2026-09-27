@@ -2,6 +2,8 @@ import { storage } from './storage';
 
 export const CURRENT_APP_VERSION = '2.3.0';
 export const BUILD_DATE = '2026-09-27';
+export const GITHUB_REPO_URL = 'https://github.com/lexwd/WorkWiki3';
+export const GITHUB_RELEASES_URL = 'https://github.com/lexwd/WorkWiki3/releases';
 
 export interface VersionInfo {
   version: string;
@@ -9,6 +11,7 @@ export interface VersionInfo {
   minCompatibleVersion?: string;
   title?: string;
   features?: string[];
+  downloadUrl?: string;
 }
 
 export interface UpdateCheckResult {
@@ -18,6 +21,7 @@ export interface UpdateCheckResult {
   buildDate?: string;
   title?: string;
   features: string[];
+  downloadUrl?: string;
   checkFailed?: boolean;
   errorMessage?: string;
 }
@@ -35,6 +39,28 @@ export function compareSemver(current: string, target: string): number {
   return 0;
 }
 
+/**
+ * Fetch with strict timeout using AbortController to prevent hanging UI
+ */
+async function fetchWithTimeout(url: string, timeoutMs = 3500): Promise<Response> {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const fullUrl = url.includes('?') ? `${url}&_t=${Date.now()}` : `${url}?_t=${Date.now()}`;
+    const response = await fetch(fullUrl, {
+      signal: controller.signal,
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        Pragma: 'no-cache',
+      },
+    });
+    return response;
+  } finally {
+    clearTimeout(id);
+  }
+}
+
 export const updateManager = {
   getCurrentVersion(): string {
     return CURRENT_APP_VERSION;
@@ -44,8 +70,20 @@ export const updateManager = {
     return BUILD_DATE;
   },
 
+  getReleasesUrl(): string {
+    return GITHUB_RELEASES_URL;
+  },
+
+  openExternalUrl(url: string): void {
+    if (window.electronAPI?.openExternalUrl) {
+      window.electronAPI.openExternalUrl(url);
+    } else {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
+  },
+
   async checkForUpdates(): Promise<UpdateCheckResult> {
-    // 1. If running in Electron desktop container, use native HTTPS IPC bridge
+    // 1. If running in Electron desktop container, try native HTTPS IPC bridge first
     if (window.electronAPI?.checkForUpdates) {
       try {
         const electronRes = await window.electronAPI.checkForUpdates();
@@ -58,48 +96,38 @@ export const updateManager = {
             buildDate: electronRes.buildDate,
             title: electronRes.title,
             features: electronRes.releaseNotes ? electronRes.releaseNotes.split('\n').filter(Boolean) : [],
+            downloadUrl: GITHUB_RELEASES_URL,
             checkFailed: false,
           };
         }
       } catch (err) {
-        console.warn('Electron IPC update check failed:', err);
+        console.warn('Electron IPC update check failed, attempting HTTP fallback:', err);
       }
     }
 
-    // 2. Web / Browser / PWA multi-source fetch
+    // 2. Web / Browser / PWA multi-source fetch with strict timeout
     const baseUrl = import.meta.env.BASE_URL || './';
     const localVersionPath = baseUrl.endsWith('/') ? `${baseUrl}version.json` : `${baseUrl}/version.json`;
 
-    // Prioritized list of endpoints to check
+    // Prioritized list of endpoints to check (GitHub Pages CDN first for global accessibility, then raw github, then local)
     const candidateUrls: string[] = [
-      // Primary: raw GitHub repository (always up to date immediately on git push, has CORS *)
-      'https://raw.githubusercontent.com/lexwd/WorkWiki3/main/public/version.json',
-      // Secondary: GitHub Pages deployment
       'https://lexwd.github.io/WorkWiki3/version.json',
-      // Tertiary: local / same-host relative path
+      'https://raw.githubusercontent.com/lexwd/WorkWiki3/main/public/version.json',
       localVersionPath,
     ];
 
-    let lastError: Error | null = null;
+    let lastError: any = null;
 
     for (const url of candidateUrls) {
       try {
-        const fullUrl = url.includes('?') ? `${url}&_t=${Date.now()}` : `${url}?_t=${Date.now()}`;
-        const res = await fetch(fullUrl, {
-          cache: 'no-store',
-          headers: {
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            Pragma: 'no-cache',
-          },
-        });
-
+        const res = await fetchWithTimeout(url, 3500);
         if (!res.ok) {
           throw new Error(`HTTP ${res.status}`);
         }
 
         const info: VersionInfo = await res.json();
         if (!info || !info.version) {
-          throw new Error('Invalid version format received');
+          throw new Error('Некорректный формат файла версий');
         }
 
         const hasUpdate = compareSemver(CURRENT_APP_VERSION, info.version) > 0;
@@ -111,11 +139,12 @@ export const updateManager = {
           buildDate: info.buildDate,
           title: info.title,
           features: info.features || [],
+          downloadUrl: info.downloadUrl || GITHUB_RELEASES_URL,
           checkFailed: false,
         };
       } catch (err: any) {
         lastError = err;
-        // Continue trying next candidate
+        // Proceed to next candidate immediately
       }
     }
 
@@ -125,8 +154,9 @@ export const updateManager = {
       currentVersion: CURRENT_APP_VERSION,
       latestVersion: CURRENT_APP_VERSION,
       features: [],
+      downloadUrl: GITHUB_RELEASES_URL,
       checkFailed: true,
-      errorMessage: 'Не удалось связаться с сервером обновлений. Проверьте интернет-соединение.',
+      errorMessage: 'Сервер обновлений временно недоступен. Проверьте интернет-соединение или страницу релизов на GitHub.',
     };
   },
 
@@ -184,4 +214,3 @@ export const updateManager = {
 
 export const checkForUpdate = () => updateManager.checkForUpdates();
 export const checkForUpdates = () => updateManager.checkForUpdates();
-

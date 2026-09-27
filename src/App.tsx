@@ -17,6 +17,7 @@ import {
 import { storage } from './utils/storage';
 import { soundService } from './utils/sound';
 import { interpolateSnippet } from './utils/interpolator';
+import { copyToClipboard } from './utils/clipboard';
 import { getThemeClasses, getAccentClasses, getFontScaleStyle } from './utils/theme';
 import { checkForUpdate, CURRENT_APP_VERSION } from './utils/updateManager';
 import { DesktopHeader } from './components/DesktopHeader';
@@ -210,11 +211,9 @@ export default function App() {
 
   // Copy snippet or resolved text
   const handleCopySnippet = useCallback(
-    (snippet: Snippet) => {
+    async (snippet: Snippet) => {
       const { result } = interpolateSnippet(snippet.content, placeholders, activeRow, settings.agentName);
-      navigator.clipboard.writeText(result).catch((err) => {
-        console.warn('Clipboard write prevented:', err);
-      });
+      await copyToClipboard(result);
 
       soundService.playCopyChime(settings.soundEffects);
       showToast(snippet.title, result);
@@ -241,10 +240,8 @@ export default function App() {
   );
 
   const handleCopyResolvedText = useCallback(
-    (text: string, title: string = 'Ответ оператора') => {
-      navigator.clipboard.writeText(text).catch((err) => {
-        console.warn('Clipboard write error:', err);
-      });
+    async (text: string, title: string = 'Ответ оператора') => {
+      await copyToClipboard(text);
 
       soundService.playCopyChime(settings.soundEffects);
       showToast(title, text);

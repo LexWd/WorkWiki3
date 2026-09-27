@@ -35,6 +35,7 @@ import { NoteCard, NoteCardColor, GuiSettings } from '../types';
 import { getThemeClasses, getAccentClasses } from '../utils/theme';
 import { soundService } from '../utils/sound';
 import { storage } from '../utils/storage';
+import { copyToClipboard } from '../utils/clipboard';
 import { NoteEditorModal } from './NoteEditorModal';
 import { ConfirmDialogModal } from './ConfirmDialogModal';
 
@@ -328,7 +329,7 @@ export const NotesManagerPanel: React.FC<NotesManagerPanelProps> = ({
   }, [notes]);
 
   // Handle copying note content to clipboard
-  const handleCopyNote = (n: NoteCard) => {
+  const handleCopyNote = async (n: NoteCard) => {
     let textToCopy = n.title ? `${n.title}\n${n.content}` : n.content;
     if (n.checklist && n.checklist.length > 0) {
       const checklistText = n.checklist
@@ -337,7 +338,7 @@ export const NotesManagerPanel: React.FC<NotesManagerPanelProps> = ({
       textToCopy += `\n\nЧек-лист:\n${checklistText}`;
     }
 
-    navigator.clipboard.writeText(textToCopy);
+    await copyToClipboard(textToCopy);
     soundService.playCopyChime(settings.soundEffects);
     setCopiedNoteId(n.id);
     setTimeout(() => setCopiedNoteId(null), 1800);
@@ -425,9 +426,9 @@ export const NotesManagerPanel: React.FC<NotesManagerPanelProps> = ({
     soundService.playSuccess(settings.soundEffects);
   };
 
-  const handleCopyScratchpad = () => {
+  const handleCopyScratchpad = async () => {
     if (!scratchpadText) return;
-    navigator.clipboard.writeText(scratchpadText);
+    await copyToClipboard(scratchpadText);
     soundService.playCopyChime(settings.soundEffects);
     onNotification?.('Текст оперативного блокнота скопирован!');
   };

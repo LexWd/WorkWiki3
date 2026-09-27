@@ -44,6 +44,7 @@ import { getThemeClasses, getAccentClasses } from '../utils/theme';
 import { soundService } from '../utils/sound';
 import { storage } from '../utils/storage';
 import { renderCategoryIcon as renderMetaCategoryIcon } from '../utils/categoryMeta';
+import { copyToClipboard } from '../utils/clipboard';
 import { ConfirmDialogModal } from './ConfirmDialogModal';
 import { DEFAULT_RESOURCE_CATEGORIES } from '../data/defaultData';
 import { ResourceCategoryManagerModal } from './ResourceCategoryManagerModal';
@@ -97,6 +98,7 @@ export const ResourcesAndWidgetsPanel: React.FC<ResourcesAndWidgetsPanelProps> =
   onRenameCategory,
   onDeleteCategory,
   onResetCategories,
+  customIcons = [],
   settings,
 }) => {
   const [selectedCategory, setSelectedCategory] = useState('Все');
@@ -159,10 +161,13 @@ export const ResourcesAndWidgetsPanel: React.FC<ResourcesAndWidgetsPanelProps> =
   // Helper to render widget icon
   const renderWidgetIcon = (iconType?: string, className = 'w-4 h-4') => {
     if (!iconType) return <Globe className={className} />;
-    // Check if it's a custom icon ID or data URL
-    if (iconType.startsWith('custom_') || iconType.startsWith('data:image')) {
-      return renderMetaCategoryIcon(iconType, className, settings ? undefined : undefined);
+    
+    // Check if it's a registered custom icon or image/svg
+    const isCustom = customIcons.some((ci) => ci.id === iconType);
+    if (isCustom || iconType.startsWith('custom_') || iconType.startsWith('ci_') || iconType.startsWith('data:image') || iconType.startsWith('<svg')) {
+      return renderMetaCategoryIcon(iconType, className, customIcons);
     }
+
     switch (iconType) {
       case 'truck':
         return <Truck className={className} />;
@@ -170,6 +175,8 @@ export const ResourcesAndWidgetsPanel: React.FC<ResourcesAndWidgetsPanelProps> =
         return <Package className={className} />;
       case 'map-pin':
         return <MapPin className={className} />;
+      case 'globe':
+        return <Globe className={className} />;
       case 'book-open':
         return <BookOpen className={className} />;
       case 'headphones':
@@ -187,7 +194,7 @@ export const ResourcesAndWidgetsPanel: React.FC<ResourcesAndWidgetsPanelProps> =
       case 'sparkles':
         return <Sparkles className={className} />;
       default:
-        return <Globe className={className} />;
+        return renderMetaCategoryIcon(iconType, className, customIcons);
     }
   };
 
@@ -342,9 +349,9 @@ export const ResourcesAndWidgetsPanel: React.FC<ResourcesAndWidgetsPanelProps> =
   }, [filteredWidgets]);
 
   // Copy link handler
-  const handleCopyLink = (url: string, e: React.MouseEvent) => {
+  const handleCopyLink = async (url: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    navigator.clipboard.writeText(url);
+    await copyToClipboard(url);
     setCopiedUrl(url);
     soundService.playCopyChime(settings.soundEffects);
     setTimeout(() => setCopiedUrl(null), 2000);
@@ -1306,9 +1313,18 @@ export const ResourcesAndWidgetsPanel: React.FC<ResourcesAndWidgetsPanelProps> =
 
               {/* Custom Icon Selection */}
               <div>
-                <label className="block text-[11px] font-medium text-slate-300 mb-1">
-                  Выбор иконки карточки
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[11px] font-medium text-slate-300">
+                    Выбор иконки карточки
+                  </label>
+                  {customIcons.length > 0 && (
+                    <span className="text-[10px] text-sky-400 font-medium">
+                      Своих иконок: {customIcons.length}
+                    </span>
+                  )}
+                </div>
+
+                {/* Standard icons */}
                 <div className="grid grid-cols-4 sm:grid-cols-6 gap-1.5 max-h-36 overflow-y-auto p-1 bg-slate-900/60 rounded-lg border border-slate-800">
                   {AVAILABLE_ICONS.map((ic) => (
                     <button
@@ -1329,6 +1345,35 @@ export const ResourcesAndWidgetsPanel: React.FC<ResourcesAndWidgetsPanelProps> =
                     </button>
                   ))}
                 </div>
+
+                {/* Custom user icons if available */}
+                {customIcons.length > 0 && (
+                  <div className="mt-2 pt-2 border-t border-slate-800">
+                    <span className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-wider">
+                      Загруженные свои иконки ({customIcons.length})
+                    </span>
+                    <div className="grid grid-cols-4 sm:grid-cols-6 gap-1.5 max-h-36 overflow-y-auto p-1 bg-slate-900/60 rounded-lg border border-slate-800">
+                      {customIcons.map((ci) => (
+                        <button
+                          key={ci.id}
+                          type="button"
+                          onClick={() => setFormIcon(ci.id)}
+                          className={`flex flex-col items-center justify-center p-1.5 rounded border transition-all ${
+                            formIcon === ci.id
+                              ? 'border-sky-500 bg-sky-500/20 text-sky-200 shadow-xs'
+                              : 'border-slate-800 bg-slate-800/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                          }`}
+                          title={ci.name}
+                        >
+                          {renderWidgetIcon(ci.id, 'w-4 h-4 mb-0.5')}
+                          <span className="text-[9px] truncate max-w-full text-center leading-tight">
+                            {ci.name}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Color Accent Picker */}

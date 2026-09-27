@@ -145,6 +145,34 @@ export const PlaceholderManagerPanel: React.FC<PlaceholderManagerPanelProps> = (
     setIsResetConfirmOpen(true);
   };
 
+  const handleSaveConditionAsPlaceholder = (data: {
+    key: string;
+    label: string;
+    description: string;
+    defaultValue: string;
+  }) => {
+    let cleanKey = data.key.toLowerCase().replace(/[^a-zа-яё0-9_]/gi, '_');
+    let candidate = cleanKey;
+    let counter = 1;
+    while (placeholders.some((p) => p.key === candidate)) {
+      candidate = `${cleanKey}_${counter++}`;
+    }
+
+    const payload: PlaceholderConfig = {
+      id: 'ph-' + Date.now(),
+      key: candidate,
+      label: data.label.trim() || candidate,
+      description: data.description.trim(),
+      type: 'text',
+      defaultValue: data.defaultValue.trim(),
+    };
+
+    onUpdatePlaceholders([...placeholders, payload]);
+    startEdit(payload);
+    soundService.playCopyChime(settings.soundEffects);
+    setIsConditionalBuilderOpen(false);
+  };
+
   return (
     <div className={`flex flex-col h-full ${theme.panel} overflow-hidden text-xs select-none`}>
       {/* Header */}
@@ -156,7 +184,7 @@ export const PlaceholderManagerPanel: React.FC<PlaceholderManagerPanelProps> = (
           <div>
             <h2 className="font-bold text-sm text-slate-100">База данных плейсхолдеров</h2>
             <p className="text-[11px] text-slate-400">
-              Стандартные данные, списки выбора и привязка к колонкам таблицы
+              Стандартные данные, списки вариантов и динамические значения шаблонов
             </p>
           </div>
         </div>
@@ -258,7 +286,7 @@ export const PlaceholderManagerPanel: React.FC<PlaceholderManagerPanelProps> = (
                   </div>
                 )}
 
-                {/* Binding and default info */}
+                {/* Default value info */}
                 <div className="mt-2 pt-1.5 flex items-center justify-between text-[10.5px] text-slate-400">
                   <div className="truncate">
                     По умолч.:{' '}
@@ -268,12 +296,6 @@ export const PlaceholderManagerPanel: React.FC<PlaceholderManagerPanelProps> = (
                       <span className="text-amber-400/90 font-medium italic font-mono">(пусто)</span>
                     )}
                   </div>
-                  {p.excelColumnBinding && (
-                    <div className="flex items-center gap-1 text-emerald-400 shrink-0">
-                      <Link2 className="w-3 h-3" />
-                      <span>Excel: {p.excelColumnBinding}</span>
-                    </div>
-                  )}
                 </div>
               </div>
             ))}
@@ -470,53 +492,42 @@ export const PlaceholderManagerPanel: React.FC<PlaceholderManagerPanelProps> = (
                     <label className="text-[11px] font-medium text-slate-300">
                       Значение по умолчанию
                     </label>
-                    {formDefaultVal !== '' && (
+                    <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => setFormDefaultVal('')}
-                        className="text-[10px] text-amber-400 hover:text-amber-300 underline cursor-pointer"
+                        onClick={() => setIsConditionalBuilderOpen(true)}
+                        className="flex items-center gap-1 text-[10.5px] font-semibold text-purple-400 hover:text-purple-300 transition-colors cursor-pointer"
+                        title="Открыть конструктор логических условий Если/Иначе для этого поля"
                       >
-                        Сделать пустым
+                        <Sparkles className="w-3 h-3 text-purple-400" />
+                        <span>Собрать условие (Если/Иначе)</span>
                       </button>
-                    )}
+
+                      {formDefaultVal !== '' && (
+                        <button
+                          type="button"
+                          onClick={() => setFormDefaultVal('')}
+                          className="text-[10px] text-amber-400 hover:text-amber-300 underline cursor-pointer"
+                        >
+                          Сделать пустым
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <input
                     type="text"
                     value={formDefaultVal}
                     onChange={(e) => setFormDefaultVal(e.target.value)}
-                    placeholder="Оставьте пустым для пустого значения по умолчанию"
+                    placeholder="Оставьте пустым для свободного ввода или введите значение..."
                     className={`w-full p-1.5 rounded border text-xs outline-none ${theme.input}`}
                   />
                   <span className="text-[10px] text-slate-500 mt-1 block">
                     {formDefaultVal.trim() === ''
                       ? '✓ Пустое значение: шаблон будет ждать ввода от оператора или останется пустым.'
-                      : 'Это значение будет автоматически подставляться в шаблон.'}
+                      : 'Это значение будет автоматически подставляться в шаблон при генерации ответа.'}
                   </span>
                 </div>
               )}
-
-              {/* Excel Column Binding */}
-              <div>
-                <label className="block text-[11px] font-medium text-slate-300 mb-1 flex items-center gap-1">
-                  <Link2 className="w-3.5 h-3.5 text-emerald-400" />
-                  Привязать к колонке Excel (автозаполнение из строки)
-                </label>
-                <select
-                  value={formBinding}
-                  onChange={(e) => setFormBinding(e.target.value)}
-                  className={`w-full p-1.5 rounded border text-xs outline-none cursor-pointer ${theme.input}`}
-                >
-                  <option value="">-- Без привязки к Excel --</option>
-                  {availableColumns.map((col) => (
-                    <option key={col} value={col}>
-                      Колонка Excel: {col}
-                    </option>
-                  ))}
-                </select>
-                <span className="text-[10px] text-slate-500 mt-0.5 block">
-                  Когда в таблице выбрана строка, значение возьмется напрямую из нее.
-                </span>
-              </div>
             </div>
 
             {/* Actions */}
@@ -604,6 +615,11 @@ export const PlaceholderManagerPanel: React.FC<PlaceholderManagerPanelProps> = (
         isOpen={isConditionalBuilderOpen}
         onClose={() => setIsConditionalBuilderOpen(false)}
         placeholders={placeholders}
+        onApplyToField={(syntax) => {
+          setFormDefaultVal(syntax);
+          if (formType !== 'text') setFormType('text');
+        }}
+        onSaveAsPlaceholder={handleSaveConditionAsPlaceholder}
         settings={settings}
       />
     </div>

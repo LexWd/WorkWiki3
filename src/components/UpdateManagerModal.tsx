@@ -73,6 +73,11 @@ export const UpdateManagerModal: React.FC<UpdateManagerModalProps> = ({
     }, 700);
   };
 
+  const handleOpenReleases = () => {
+    soundService.playClick(settings.soundEffects);
+    updateManager.openExternalUrl(checkResult?.downloadUrl || updateManager.getReleasesUrl());
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-xs animate-in fade-in duration-150">
       <div 
@@ -160,31 +165,62 @@ export const UpdateManagerModal: React.FC<UpdateManagerModalProps> = ({
                 </div>
               )}
 
-              <div className="flex items-center gap-2 pt-1">
+              <div className="flex flex-col sm:flex-row items-center gap-2 pt-1">
                 <button
                   type="button"
                   disabled={isUpdating}
                   onClick={handleApplyUpdate}
-                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl font-bold text-xs text-white shadow-lg transition-all cursor-pointer ${accent.primary} hover:opacity-95 disabled:opacity-60`}
+                  className={`w-full sm:flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl font-bold text-xs text-white shadow-lg transition-all cursor-pointer ${accent.primary} hover:opacity-95 disabled:opacity-60`}
                 >
                   <DownloadCloud className={`w-4 h-4 ${isUpdating ? 'animate-bounce' : ''}`} />
                   <span>{isUpdating ? 'Применение обновления...' : 'Обновить сейчас (без переустановки)'}</span>
                 </button>
+
+                <button
+                  type="button"
+                  onClick={handleOpenReleases}
+                  className="w-full sm:w-auto flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl font-semibold text-xs text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-colors cursor-pointer shrink-0"
+                  title="Скачать установочный файл или Portable-версию с GitHub"
+                >
+                  <ExternalLink className="w-3.5 h-3.5 text-sky-400" />
+                  <span>Скачать .EXE на GitHub</span>
+                </button>
               </div>
             </div>
           ) : checkResult?.checkFailed ? (
-            <div className="p-3.5 rounded-xl bg-amber-950/30 border border-amber-500/30 flex items-center gap-2.5 text-amber-300">
-              <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
-              <span>
-                {checkResult.errorMessage || 'Не удалось связаться с сервером обновлений. Проверьте соединение с интернетом.'}
-              </span>
+            <div className="p-3.5 rounded-xl bg-amber-950/30 border border-amber-500/30 space-y-2 text-amber-300">
+              <div className="flex items-center gap-2.5">
+                <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>
+                  {checkResult.errorMessage || 'Не удалось связаться с сервером обновлений. Проверьте соединение с интернетом.'}
+                </span>
+              </div>
+              <div className="flex justify-end pt-1">
+                <button
+                  type="button"
+                  onClick={handleOpenReleases}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-sky-300 bg-slate-900 border border-slate-700 hover:border-sky-500 transition-colors cursor-pointer"
+                >
+                  <ExternalLink className="w-3.5 h-3.5 text-sky-400" />
+                  <span>Открыть страницу релизов на GitHub</span>
+                </button>
+              </div>
             </div>
           ) : (
-            <div className="p-3.5 rounded-xl bg-emerald-950/30 border border-emerald-500/30 flex items-center gap-2.5 text-emerald-300">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span>
-                {statusMessage || `У вас установлена последняя версия программы (v${CURRENT_APP_VERSION}). Приложение работает в оптимальном режиме.`}
-              </span>
+            <div className="p-3.5 rounded-xl bg-emerald-950/30 border border-emerald-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-emerald-300">
+              <div className="flex items-center gap-2.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>
+                  {statusMessage || `У вас установлена последняя версия программы (v${CURRENT_APP_VERSION}). Приложение работает в оптимальном режиме.`}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={handleOpenReleases}
+                className="text-[11px] text-sky-400 hover:text-sky-300 font-semibold underline underline-offset-2 shrink-0 cursor-pointer"
+              >
+                Релизы на GitHub
+              </button>
             </div>
           )}
 

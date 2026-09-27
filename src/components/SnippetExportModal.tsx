@@ -15,6 +15,7 @@ import {
 import { Snippet, SnippetCollectionExport, GuiSettings } from '../types';
 import { getThemeClasses, getAccentClasses } from '../utils/theme';
 import { soundService } from '../utils/sound';
+import { copyToClipboard } from '../utils/clipboard';
 
 interface SnippetExportModalProps {
   isOpen: boolean;
@@ -121,19 +122,16 @@ export const SnippetExportModal: React.FC<SnippetExportModalProps> = ({
     }
   };
 
-  const handleCopyJson = () => {
+  const handleCopyJson = async () => {
     if (exportSnippets.length === 0) return;
 
-    navigator.clipboard.writeText(jsonString).then(() => {
-      setIsCopied(true);
-      soundService.playCopyChime(settings.soundEffects);
-      if (onNotify) {
-        onNotify('JSON скопирован', `Коллекция «${exportObject.collectionName}» скопирована в буфер обмена`);
-      }
-      setTimeout(() => setIsCopied(false), 2000);
-    }).catch((err) => {
-      console.warn('Clipboard write failed', err);
-    });
+    await copyToClipboard(jsonString);
+    setIsCopied(true);
+    soundService.playCopyChime(settings.soundEffects);
+    if (onNotify) {
+      onNotify('JSON скопирован', `Коллекция «${exportObject.collectionName}» скопирована в буфер обмена`);
+    }
+    setTimeout(() => setIsCopied(false), 2000);
   };
 
   // Group snippet count by category for helper list
