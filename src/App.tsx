@@ -72,7 +72,7 @@ export default function App() {
   // Modals & UI overlays
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [settingsInitialSection, setSettingsInitialSection] = useState<'gui' | 'collections' | 'backup'>('gui');
+  const [settingsInitialSection, setSettingsInitialSection] = useState<'gui' | 'icons' | 'collections' | 'backup'>('gui');
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   const [editingSnippet, setEditingSnippet] = useState<Snippet | null | 'NEW'>(null);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
@@ -1033,7 +1033,11 @@ export default function App() {
         snippets={snippets}
         onImportSnippets={handleImportSnippets}
         initialSection={settingsInitialSection}
-        onNotification={(msg) => showToast('Коллекции', msg)}
+        onNotification={(msg) => showToast('Настройки', msg)}
+        customIcons={customIcons}
+        onUpdateCustomIcons={setCustomIcons}
+        hiddenIconIds={hiddenIconIds}
+        onUpdateHiddenIconIds={setHiddenIconIds}
       />
 
       {/* 4. Shortcuts Cheat Sheet Modal */}
@@ -1052,6 +1056,7 @@ export default function App() {
         onAddCategory={handleAddCategory}
         onDeleteCategory={handleDeleteCategory}
         onRenameCategory={handleRenameCategory}
+        onReorderCategories={setCategories}
         onResetCategories={handleResetCategories}
         categoryMetadata={categoryMetadata}
         onUpdateCategoryMetadata={handleUpdateCategoryMetadata}

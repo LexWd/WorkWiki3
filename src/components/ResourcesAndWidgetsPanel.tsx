@@ -116,6 +116,8 @@ export const ResourcesAndWidgetsPanel: React.FC<ResourcesAndWidgetsPanelProps> =
   });
   const [cardDensity, setCardDensity] = useState<'normal' | 'compact'>('normal');
   const [draggingCardId, setDraggingCardId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ id: string; position: 'before' | 'after' } | null>(null);
+  const [recentMovedCardId, setRecentMovedCardId] = useState<string | null>(null);
   
   // Category management modal
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
@@ -265,6 +267,8 @@ export const ResourcesAndWidgetsPanel: React.FC<ResourcesAndWidgetsPanelProps> =
 
     setCustomOrder(fullOrder);
     storage.saveResourceOrder(fullOrder);
+    setRecentMovedCardId(cardId);
+    setTimeout(() => setRecentMovedCardId(null), 1800);
     soundService.playClick(settings.soundEffects);
   };
 
@@ -274,26 +278,62 @@ export const ResourcesAndWidgetsPanel: React.FC<ResourcesAndWidgetsPanelProps> =
     e.dataTransfer.effectAllowed = 'move';
   };
 
+  const handleDragOverCard = (targetCardId: string, e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (!draggingCardId || draggingCardId === targetCardId) {
+      if (dropTarget) setDropTarget(null);
+      return;
+    }
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const midX = rect.left + rect.width / 2;
+    const position = e.clientX < midX ? 'before' : 'after';
+    if (!dropTarget || dropTarget.id !== targetCardId || dropTarget.position !== position) {
+      setDropTarget({ id: targetCardId, position });
+    }
+  };
+
+  const handleDragLeaveCard = (targetCardId: string, e: React.DragEvent) => {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    if (
+      e.clientX <= rect.left ||
+      e.clientX >= rect.right ||
+      e.clientY <= rect.top ||
+      e.clientY >= rect.bottom
+    ) {
+      if (dropTarget?.id === targetCardId) {
+        setDropTarget(null);
+      }
+    }
+  };
+
   const handleDropOnCard = (targetCardId: string, e: React.DragEvent) => {
     e.preventDefault();
     const sourceId = draggingCardId || e.dataTransfer.getData('text/plain');
+    const pos = dropTarget?.id === targetCardId ? dropTarget.position : 'before';
     setDraggingCardId(null);
+    setDropTarget(null);
     if (!sourceId || sourceId === targetCardId) return;
 
     const currentIds = sortedLinkCards.map((c) => c.id);
     const sourceIdx = currentIds.indexOf(sourceId);
-    const targetIdx = currentIds.indexOf(targetCardId);
-    if (sourceIdx === -1 || targetIdx === -1) return;
+    if (sourceIdx === -1) return;
 
     const newOrder = [...currentIds];
     const [removed] = newOrder.splice(sourceIdx, 1);
-    newOrder.splice(targetIdx, 0, removed);
+    const targetIdx = newOrder.indexOf(targetCardId);
+    if (targetIdx === -1) return;
+
+    const insertIndex = pos === 'after' ? targetIdx + 1 : targetIdx;
+    newOrder.splice(insertIndex, 0, removed);
 
     const allOtherIds = widgets.map((w) => w.id).filter((id) => !currentIds.includes(id));
     const fullOrder = [...newOrder, ...allOtherIds];
 
     setCustomOrder(fullOrder);
     storage.saveResourceOrder(fullOrder);
+    setRecentMovedCardId(sourceId);
+    setTimeout(() => setRecentMovedCardId(null), 1800);
     soundService.playSuccess(settings.soundEffects);
   };
 
@@ -737,22 +777,49 @@ export const ResourcesAndWidgetsPanel: React.FC<ResourcesAndWidgetsPanelProps> =
                 const isFirst = cardIndex === 0;
                 const isLast = cardIndex === sortedLinkCards.length - 1;
 
+                const isHoveredTarget = dropTarget?.id === card.id;
+                const isJustMoved = recentMovedCardId === card.id;
+
                 return (
                   <div
                     key={card.id}
                     draggable={sortMode === 'custom'}
                     onDragStart={(e) => handleDragStart(card.id, e)}
-                    onDragOver={(e) => e.preventDefault()}
+                    onDragOver={(e) => handleDragOverCard(card.id, e)}
+                    onDragLeave={(e) => handleDragLeaveCard(card.id, e)}
                     onDrop={(e) => handleDropOnCard(card.id, e)}
                     onClick={() => handleOpenInBrowser(card.url)}
-                    className={`group relative rounded-xl border transition-all cursor-pointer flex flex-col justify-between ${
+                    className={`group relative rounded-xl border transition-all duration-150 cursor-pointer flex flex-col justify-between ${
                       cardDensity === 'compact' ? 'p-2.5' : 'p-3.5'
                     } ${theme.panelHeader} ${
                       draggingCardId === card.id
-                        ? 'opacity-40 border-sky-400 border-dashed scale-98'
+                        ? 'opacity-35 border-sky-400 border-dashed scale-[0.98] bg-sky-950/20 shadow-none'
+                        : isJustMoved
+                        ? 'border-emerald-400 ring-2 ring-emerald-400/80 bg-emerald-500/10 shadow-lg scale-[1.01]'
+                        : isHoveredTarget
+                        ? 'border-sky-400 ring-2 ring-sky-400/50 shadow-xl'
                         : 'border-slate-800 hover:border-slate-600 hover:shadow-lg hover:-translate-y-0.5'
                     }`}
                   >
+                    {/* Visual Insertion Line & Preview Badge of Future Placement */}
+                    {isHoveredTarget && (
+                      <>
+                        {dropTarget.position === 'before' ? (
+                          <div className="absolute -left-1.5 top-0 bottom-0 w-1.5 bg-gradient-to-b from-sky-400 to-indigo-500 rounded-full shadow-[0_0_12px_#38bdf8] animate-pulse z-30 pointer-events-none" />
+                        ) : (
+                          <div className="absolute -right-1.5 top-0 bottom-0 w-1.5 bg-gradient-to-b from-sky-400 to-indigo-500 rounded-full shadow-[0_0_12px_#38bdf8] animate-pulse z-30 pointer-events-none" />
+                        )}
+                        <div
+                          className={`absolute -top-3.5 ${
+                            dropTarget.position === 'before' ? 'left-1' : 'right-1'
+                          } px-2 py-0.5 rounded-full bg-sky-500 text-white text-[9px] font-bold shadow-lg z-40 pointer-events-none flex items-center gap-1 animate-bounce`}
+                        >
+                          <Sparkles className="w-2.5 h-2.5" />
+                          <span>{dropTarget.position === 'before' ? 'Вставить перед' : 'Вставить после'}</span>
+                        </div>
+                      </>
+                    )}
+
                     <div>
                       {/* Top Row: Icon, Title, Actions */}
                       <div className="flex items-start justify-between gap-2 mb-2">

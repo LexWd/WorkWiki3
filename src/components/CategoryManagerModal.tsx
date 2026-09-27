@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { Reorder, motion, AnimatePresence } from 'motion/react';
 import { 
   FolderCog, 
   Plus, 
@@ -12,12 +13,16 @@ import {
   Palette,
   ChevronDown,
   Image as ImageIcon,
-  Sparkles
+  Sparkles,
+  GripVertical,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react';
 import { Snippet, GuiSettings, CategoryColor, CategoryMetadata, CustomIcon } from '../types';
 import { getThemeClasses, getAccentClasses } from '../utils/theme';
 import { DEFAULT_CATEGORY_LIST } from '../data/defaultData';
 import { soundService } from '../utils/sound';
+import { storage } from '../utils/storage';
 import { ConfirmDialogModal } from './ConfirmDialogModal';
 import { IconManagerModal } from './IconManagerModal';
 import { 
@@ -35,6 +40,7 @@ interface CategoryManagerModalProps {
   onAddCategory: (categoryName: string) => void;
   onDeleteCategory: (categoryName: string, reassignTo?: string) => void;
   onRenameCategory?: (oldName: string, newName: string) => void;
+  onReorderCategories?: (categories: string[]) => void;
   onResetCategories: () => void;
   categoryMetadata?: Record<string, CategoryMetadata>;
   onUpdateCategoryMetadata?: (categoryName: string, meta: Partial<CategoryMetadata>) => void;
@@ -53,6 +59,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   onAddCategory,
   onDeleteCategory,
   onRenameCategory,
+  onReorderCategories,
   onResetCategories,
   categoryMetadata,
   onUpdateCategoryMetadata,
@@ -188,6 +195,26 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
       soundService.playSuccess(settings.soundEffects);
     }
     setEditingCat(null);
+  };
+
+  const handleReorder = (newOrder: string[]) => {
+    if (onReorderCategories) {
+      onReorderCategories(newOrder);
+    }
+    storage.saveCategories(newOrder);
+    soundService.playClick(settings.soundEffects);
+  };
+
+  const handleMoveCategoryStep = (catName: string, direction: 'up' | 'down') => {
+    const idx = categories.indexOf(catName);
+    if (idx === -1) return;
+    const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= categories.length) return;
+
+    const newOrder = [...categories];
+    const [removed] = newOrder.splice(idx, 1);
+    newOrder.splice(targetIdx, 0, removed);
+    handleReorder(newOrder);
   };
 
   const availableColors = Object.keys(CATEGORY_COLOR_DEFS) as CategoryColor[];
@@ -450,222 +477,282 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
             <span>Коллекция (Иконка, Цвет, Название)</span>
             <span>Шаблонов / Настройки</span>
           </div>
+          <div className="text-[10.5px] text-sky-400/80 font-normal px-2 pb-1.5 flex items-center gap-1.5">
+            <GripVertical className="w-3 h-3 text-sky-400" />
+            <span>Перетаскивайте строки для плавного изменения порядка отображения в меню</span>
+          </div>
 
           {categories.length === 0 ? (
             <div className="text-center py-8 text-slate-400 text-xs italic">
               Все категории удалены. Нажмите «Сбросить к стандартным», чтобы восстановить базовый набор.
             </div>
           ) : (
-            categories.map((cat) => {
-              const count = getCategoryCount(cat);
-              const isDefault = DEFAULT_CATEGORY_LIST.includes(cat);
-              const isEditing = editingCat === cat;
-              const meta = getCategoryMeta(cat, categoryMetadata);
-              const isCustomizing = customizingCat === cat;
+            <Reorder.Group
+              axis="y"
+              values={categories}
+              onReorder={handleReorder}
+              className="space-y-1.5"
+            >
+              {categories.map((cat, idx) => {
+                const count = getCategoryCount(cat);
+                const isDefault = DEFAULT_CATEGORY_LIST.includes(cat);
+                const isEditing = editingCat === cat;
+                const meta = getCategoryMeta(cat, categoryMetadata);
+                const isCustomizing = customizingCat === cat;
 
-              return (
-                <div
-                  key={cat}
-                  className={`p-2.5 rounded-lg border transition-all ${theme.panelSubtle} border-slate-800/80 hover:border-slate-700 space-y-2`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 flex-1 min-w-0 mr-2">
-                      {/* Category Icon Badge with Color */}
-                      <button
-                        type="button"
-                        onClick={() => setCustomizingCat(isCustomizing ? null : cat)}
-                        className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 border transition-all hover:scale-110 cursor-pointer ${meta.style.pillBg} ${meta.style.pillBorder} ${meta.style.pillText}`}
-                        title="Нажмите для смены иконки или цвета коллекции"
-                      >
-                        {renderCategoryIcon(meta.icon, 'w-3.5 h-3.5')}
-                      </button>
-
-                      {isEditing ? (
-                        <div className="flex items-center gap-1.5 flex-1">
-                          <input
-                            ref={editInputRef}
-                            type="text"
-                            value={editingName}
-                            onChange={(e) => setEditingName(e.target.value)}
-                            onKeyDown={(e) => {
-                              e.stopPropagation();
-                              if (e.key === 'Enter') handleSaveRename(cat);
-                              if (e.key === 'Escape') setEditingCat(null);
-                            }}
-                            className="px-2 py-0.5 text-xs bg-slate-950 border border-sky-500 rounded text-slate-100 outline-none w-full max-w-xs select-text"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => handleSaveRename(cat)}
-                            className="p-1 text-emerald-400 hover:text-emerald-300"
-                            title="Сохранить"
-                          >
-                            <Check className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setEditingCat(null)}
-                            className="p-1 text-slate-400 hover:text-slate-200"
-                            title="Отмена"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </button>
+                return (
+                  <Reorder.Item
+                    key={cat}
+                    value={cat}
+                    dragListener={!isEditing && !isCustomizing}
+                    whileDrag={{
+                      scale: 1.02,
+                      boxShadow: '0 12px 25px -4px rgba(0, 0, 0, 0.6), 0 0 0 1.5px rgba(56, 189, 248, 0.6)',
+                      zIndex: 50,
+                      cursor: 'grabbing',
+                    }}
+                    transition={{ type: 'spring', stiffness: 350, damping: 28 }}
+                    className={`p-2.5 rounded-lg border transition-colors select-none ${theme.panelSubtle} border-slate-800/80 hover:border-slate-700 space-y-2`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 flex-1 min-w-0 mr-2">
+                        {/* Drag Handle */}
+                        <div
+                          className="text-slate-600 hover:text-sky-400 p-0.5 -ml-1 cursor-grab active:cursor-grabbing shrink-0 transition-colors"
+                          title="Перетащите для изменения порядка коллекций"
+                        >
+                          <GripVertical className="w-4 h-4" />
                         </div>
-                      ) : (
-                        <div className="flex items-center gap-2 truncate">
-                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${meta.style.dotColor}`} />
-                          <span className="text-xs font-semibold text-slate-200 truncate">
-                            {cat}
-                          </span>
-                          {isDefault && (
-                            <span className="text-[9.5px] px-1.5 py-0.2 rounded bg-slate-800/90 text-slate-400 border border-slate-700/50 font-mono">
-                              стандартная
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </div>
 
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {/* Snippet count badge */}
-                      <span className={`text-[11px] font-mono px-2 py-0.5 rounded-full ${meta.style.subtleBadge} border flex items-center gap-1`}>
-                        <FileText className="w-2.5 h-2.5 opacity-60" />
-                        {count}
-                      </span>
-
-                      {/* Customize Color/Icon Button */}
-                      <button
-                        type="button"
-                        onClick={() => setCustomizingCat(isCustomizing ? null : cat)}
-                        className={`p-1 rounded transition-colors ${
-                          isCustomizing ? 'text-sky-300 bg-sky-950/60 border border-sky-500/40' : 'text-slate-400 hover:text-sky-300 hover:bg-slate-800'
-                        }`}
-                        title="Изменить иконку и цвет"
-                      >
-                        <Palette className="w-3.5 h-3.5" />
-                      </button>
-
-                      {/* Rename button */}
-                      {!isEditing && onRenameCategory && (
+                        {/* Category Icon Badge with Color */}
                         <button
                           type="button"
-                          onClick={() => startEditing(cat)}
-                          className="p-1 text-slate-400 hover:text-sky-300 rounded hover:bg-slate-800 transition-colors"
-                          title="Переименовать категорию"
+                          onClick={() => setCustomizingCat(isCustomizing ? null : cat)}
+                          className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 border transition-all hover:scale-110 cursor-pointer ${meta.style.pillBg} ${meta.style.pillBorder} ${meta.style.pillText}`}
+                          title="Нажмите для смены иконки или цвета коллекции"
                         >
-                          <Edit2 className="w-3.5 h-3.5" />
+                          {renderCategoryIcon(meta.icon, 'w-3.5 h-3.5')}
                         </button>
-                      )}
 
-                      {/* Delete button: Works on ALL categories */}
-                      <button
-                        type="button"
-                        onClick={() => initiateDelete(cat)}
-                        className="p-1 text-slate-400 hover:text-rose-400 rounded hover:bg-rose-950/30 transition-colors cursor-pointer"
-                        title={isDefault ? `Удалить категорию «${cat}»` : `Удалить категорию «${cat}»`}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Inline Color & Icon Editor Tray */}
-                  {isCustomizing && (
-                    <div className="p-2.5 bg-slate-900/90 rounded-lg border border-slate-700/70 space-y-2 mt-1 animate-in fade-in duration-100">
-                      <div className="flex items-center justify-between text-[11px] text-slate-300">
-                        <span className="font-semibold flex items-center gap-1">
-                          <Palette className="w-3 h-3 text-sky-400" />
-                          Цвет коллекции:
-                        </span>
-                        <div className="flex items-center gap-1">
-                          {availableColors.map((colorKey) => {
-                            const def = CATEGORY_COLOR_DEFS[colorKey];
-                            const isSelected = meta.color === colorKey;
-                            return (
-                              <button
-                                key={colorKey}
-                                type="button"
-                                onClick={() => {
-                                  if (onUpdateCategoryMetadata) {
-                                    onUpdateCategoryMetadata(cat, { color: colorKey });
-                                  }
-                                }}
-                                className={`w-3.5 h-3.5 rounded-full transition-transform cursor-pointer ${def.dotColor} ${
-                                  isSelected ? 'scale-125 ring-2 ring-white ring-offset-1 ring-offset-slate-900' : 'opacity-70 hover:opacity-100 hover:scale-110'
-                                }`}
-                                title={def.label}
-                              />
-                            );
-                          })}
-                        </div>
+                        {isEditing ? (
+                          <div className="flex items-center gap-1.5 flex-1">
+                            <input
+                              ref={editInputRef}
+                              type="text"
+                              value={editingName}
+                              onChange={(e) => setEditingName(e.target.value)}
+                              onKeyDown={(e) => {
+                                e.stopPropagation();
+                                if (e.key === 'Enter') handleSaveRename(cat);
+                                if (e.key === 'Escape') setEditingCat(null);
+                              }}
+                              className="px-2 py-0.5 text-xs bg-slate-950 border border-sky-500 rounded text-slate-100 outline-none w-full max-w-xs select-text"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleSaveRename(cat)}
+                              className="p-1 text-emerald-400 hover:text-emerald-300"
+                              title="Сохранить"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setEditingCat(null)}
+                              className="p-1 text-slate-400 hover:text-slate-200"
+                              title="Отмена"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 truncate">
+                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${meta.style.dotColor}`} />
+                            <span className="text-xs font-semibold text-slate-200 truncate">
+                              {cat}
+                            </span>
+                            {isDefault && (
+                              <span className="text-[9.5px] px-1.5 py-0.2 rounded bg-slate-800/90 text-slate-400 border border-slate-700/50 font-mono">
+                                стандартная
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
 
-                      <div className="text-[11px] text-slate-300 space-y-1">
-                        <div className="flex items-center justify-between">
-                          <span className="font-semibold block">Иконка коллекции:</span>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {/* Up / Down step buttons */}
+                        <div className="flex items-center bg-slate-900/80 rounded border border-slate-800 p-0.2 mr-0.5">
                           <button
                             type="button"
-                            onClick={() => {
-                              setTargetCategoryForIcons(cat);
-                              setIsIconManagerOpen(true);
+                            disabled={idx === 0}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleMoveCategoryStep(cat, 'up');
                             }}
-                            className="text-[10px] text-sky-400 hover:text-sky-300 font-medium flex items-center gap-1 cursor-pointer"
+                            className={`p-1 rounded transition-colors ${
+                              idx === 0 ? 'opacity-25 cursor-not-allowed text-slate-600' : 'text-slate-400 hover:text-sky-300 hover:bg-slate-800'
+                            }`}
+                            title="Переместить выше"
                           >
-                            <ImageIcon className="w-2.5 h-2.5" />
-                            <span>Загрузить свою...</span>
+                            <ArrowUp className="w-3 h-3" />
+                          </button>
+                          <button
+                            type="button"
+                            disabled={idx === categories.length - 1}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleMoveCategoryStep(cat, 'down');
+                            }}
+                            className={`p-1 rounded transition-colors ${
+                              idx === categories.length - 1 ? 'opacity-25 cursor-not-allowed text-slate-600' : 'text-slate-400 hover:text-sky-300 hover:bg-slate-800'
+                            }`}
+                            title="Переместить ниже"
+                          >
+                            <ArrowDown className="w-3 h-3" />
                           </button>
                         </div>
-                        <div className="grid grid-cols-6 gap-1 max-h-28 overflow-y-auto custom-scrollbar p-1.5 bg-slate-950/60 rounded border border-slate-800">
-                          {/* Custom icons first */}
-                          {customIcons.map((ci) => {
-                            const isSelected = meta.icon === ci.id;
-                            return (
-                              <button
-                                key={ci.id}
-                                type="button"
-                                onClick={() => {
-                                  if (onUpdateCategoryMetadata) {
-                                    onUpdateCategoryMetadata(cat, { icon: ci.id });
-                                  }
-                                }}
-                                className={`p-1.5 rounded flex items-center justify-center transition-colors cursor-pointer ${
-                                  isSelected ? 'bg-sky-500/25 text-sky-300 border border-sky-400/50' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
-                                }`}
-                                title={ci.name}
-                              >
-                                {renderCategoryIcon(ci.id, 'w-3.5 h-3.5', customIcons)}
-                              </button>
-                            );
-                          })}
 
-                          {/* Built-in icons */}
-                          {activeBuiltinIcons.map((item) => {
-                            const isSelected = meta.icon === item.id;
-                            return (
-                              <button
-                                key={item.id}
-                                type="button"
-                                onClick={() => {
-                                  if (onUpdateCategoryMetadata) {
-                                    onUpdateCategoryMetadata(cat, { icon: item.id });
-                                  }
-                                }}
-                                className={`p-1.5 rounded flex items-center justify-center transition-colors cursor-pointer ${
-                                  isSelected ? 'bg-sky-500/25 text-sky-300 border border-sky-400/50' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
-                                }`}
-                                title={item.label}
-                              >
-                                {renderCategoryIcon(item.id, 'w-3.5 h-3.5')}
-                              </button>
-                            );
-                          })}
-                        </div>
+                        {/* Snippet count badge */}
+                        <span className={`text-[11px] font-mono px-2 py-0.5 rounded-full ${meta.style.subtleBadge} border flex items-center gap-1`}>
+                          <FileText className="w-2.5 h-2.5 opacity-60" />
+                          {count}
+                        </span>
+
+                        {/* Customize Color/Icon Button */}
+                        <button
+                          type="button"
+                          onClick={() => setCustomizingCat(isCustomizing ? null : cat)}
+                          className={`p-1 rounded transition-colors ${
+                            isCustomizing ? 'text-sky-300 bg-sky-950/60 border border-sky-500/40' : 'text-slate-400 hover:text-sky-300 hover:bg-slate-800'
+                          }`}
+                          title="Изменить иконку и цвет"
+                        >
+                          <Palette className="w-3.5 h-3.5" />
+                        </button>
+
+                        {/* Rename button */}
+                        {!isEditing && onRenameCategory && (
+                          <button
+                            type="button"
+                            onClick={() => startEditing(cat)}
+                            className="p-1 text-slate-400 hover:text-sky-300 rounded hover:bg-slate-800 transition-colors"
+                            title="Переименовать категорию"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+
+                        {/* Delete button: Works on ALL categories */}
+                        <button
+                          type="button"
+                          onClick={() => initiateDelete(cat)}
+                          className="p-1 text-slate-400 hover:text-rose-400 rounded hover:bg-rose-950/30 transition-colors cursor-pointer"
+                          title={isDefault ? `Удалить категорию «${cat}»` : `Удалить категорию «${cat}»`}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     </div>
-                  )}
-                </div>
-              );
-            })
+
+                    {/* Inline Color & Icon Editor Tray */}
+                    {isCustomizing && (
+                      <div className="p-2.5 bg-slate-900/90 rounded-lg border border-slate-700/70 space-y-2 mt-1 animate-in fade-in duration-100">
+                        <div className="flex items-center justify-between text-[11px] text-slate-300">
+                          <span className="font-semibold flex items-center gap-1">
+                            <Palette className="w-3 h-3 text-sky-400" />
+                            Цвет коллекции:
+                          </span>
+                          <div className="flex items-center gap-1">
+                            {availableColors.map((colorKey) => {
+                              const def = CATEGORY_COLOR_DEFS[colorKey];
+                              const isSelected = meta.color === colorKey;
+                              return (
+                                <button
+                                  key={colorKey}
+                                  type="button"
+                                  onClick={() => {
+                                    if (onUpdateCategoryMetadata) {
+                                      onUpdateCategoryMetadata(cat, { color: colorKey });
+                                    }
+                                  }}
+                                  className={`w-3.5 h-3.5 rounded-full transition-transform cursor-pointer ${def.dotColor} ${
+                                    isSelected ? 'scale-125 ring-2 ring-white ring-offset-1 ring-offset-slate-900' : 'opacity-70 hover:opacity-100 hover:scale-110'
+                                  }`}
+                                  title={def.label}
+                                />
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        <div className="text-[11px] text-slate-300 space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="font-semibold block">Иконка коллекции:</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setTargetCategoryForIcons(cat);
+                                setIsIconManagerOpen(true);
+                              }}
+                              className="text-[10px] text-sky-400 hover:text-sky-300 font-medium flex items-center gap-1 cursor-pointer"
+                            >
+                              <ImageIcon className="w-2.5 h-2.5" />
+                              <span>Загрузить свою...</span>
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-6 gap-1 max-h-28 overflow-y-auto custom-scrollbar p-1.5 bg-slate-950/60 rounded border border-slate-800">
+                            {/* Custom icons first */}
+                            {customIcons.map((ci) => {
+                              const isSelected = meta.icon === ci.id;
+                              return (
+                                <button
+                                  key={ci.id}
+                                  type="button"
+                                  onClick={() => {
+                                    if (onUpdateCategoryMetadata) {
+                                      onUpdateCategoryMetadata(cat, { icon: ci.id });
+                                    }
+                                  }}
+                                  className={`p-1.5 rounded flex items-center justify-center transition-colors cursor-pointer ${
+                                    isSelected ? 'bg-sky-500/25 text-sky-300 border border-sky-400/50' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                                  }`}
+                                  title={ci.name}
+                                >
+                                  {renderCategoryIcon(ci.id, 'w-3.5 h-3.5', customIcons)}
+                                </button>
+                              );
+                            })}
+
+                            {/* Built-in icons */}
+                            {activeBuiltinIcons.map((item) => {
+                              const isSelected = meta.icon === item.id;
+                              return (
+                                <button
+                                  key={item.id}
+                                  type="button"
+                                  onClick={() => {
+                                    if (onUpdateCategoryMetadata) {
+                                      onUpdateCategoryMetadata(cat, { icon: item.id });
+                                    }
+                                  }}
+                                  className={`p-1.5 rounded flex items-center justify-center transition-colors cursor-pointer ${
+                                    isSelected ? 'bg-sky-500/25 text-sky-300 border border-sky-400/50' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                                  }`}
+                                  title={item.label}
+                                >
+                                  {renderCategoryIcon(item.id, 'w-3.5 h-3.5')}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </Reorder.Item>
+                );
+              })}
+            </Reorder.Group>
           )}
         </div>
 

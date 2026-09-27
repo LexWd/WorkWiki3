@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   Plus, 
   Search, 
@@ -134,6 +135,8 @@ export const NotesManagerPanel: React.FC<NotesManagerPanelProps> = ({
   });
   const [cardDensity, setCardDensity] = useState<'normal' | 'compact'>('normal');
   const [draggingNoteId, setDraggingNoteId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ id: string; position: 'before' | 'after' } | null>(null);
+  const [recentMovedNoteId, setRecentMovedNoteId] = useState<string | null>(null);
 
   const [editingNote, setEditingNote] = useState<NoteCard | null | 'NEW'>(null);
   const [noteToDelete, setNoteToDelete] = useState<NoteCard | null>(null);
@@ -237,6 +240,8 @@ export const NotesManagerPanel: React.FC<NotesManagerPanelProps> = ({
 
     setNotesOrder(fullOrder);
     storage.saveNotesOrder(fullOrder);
+    setRecentMovedNoteId(noteId);
+    setTimeout(() => setRecentMovedNoteId(null), 1800);
     soundService.playClick(settings.soundEffects);
   };
 
@@ -246,26 +251,62 @@ export const NotesManagerPanel: React.FC<NotesManagerPanelProps> = ({
     e.dataTransfer.effectAllowed = 'move';
   };
 
+  const handleDragOverNote = (targetNoteId: string, e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (!draggingNoteId || draggingNoteId === targetNoteId) {
+      if (dropTarget) setDropTarget(null);
+      return;
+    }
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const midX = rect.left + rect.width / 2;
+    const position = e.clientX < midX ? 'before' : 'after';
+    if (!dropTarget || dropTarget.id !== targetNoteId || dropTarget.position !== position) {
+      setDropTarget({ id: targetNoteId, position });
+    }
+  };
+
+  const handleDragLeaveNote = (targetNoteId: string, e: React.DragEvent) => {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    if (
+      e.clientX <= rect.left ||
+      e.clientX >= rect.right ||
+      e.clientY <= rect.top ||
+      e.clientY >= rect.bottom
+    ) {
+      if (dropTarget?.id === targetNoteId) {
+        setDropTarget(null);
+      }
+    }
+  };
+
   const handleDropOnNote = (targetNoteId: string, e: React.DragEvent) => {
     e.preventDefault();
     const sourceId = draggingNoteId || e.dataTransfer.getData('text/plain');
+    const pos = dropTarget?.id === targetNoteId ? dropTarget.position : 'before';
     setDraggingNoteId(null);
+    setDropTarget(null);
     if (!sourceId || sourceId === targetNoteId) return;
 
     const currentIds = sortedNotes.map((n) => n.id);
     const sourceIdx = currentIds.indexOf(sourceId);
-    const targetIdx = currentIds.indexOf(targetNoteId);
-    if (sourceIdx === -1 || targetIdx === -1) return;
+    if (sourceIdx === -1) return;
 
     const newOrder = [...currentIds];
     const [removed] = newOrder.splice(sourceIdx, 1);
-    newOrder.splice(targetIdx, 0, removed);
+    const targetIdx = newOrder.indexOf(targetNoteId);
+    if (targetIdx === -1) return;
+
+    const insertIndex = pos === 'after' ? targetIdx + 1 : targetIdx;
+    newOrder.splice(insertIndex, 0, removed);
 
     const allOtherIds = notes.map((n) => n.id).filter((id) => !currentIds.includes(id));
     const fullOrder = [...newOrder, ...allOtherIds];
 
     setNotesOrder(fullOrder);
     storage.saveNotesOrder(fullOrder);
+    setRecentMovedNoteId(sourceId);
+    setTimeout(() => setRecentMovedNoteId(null), 1800);
     soundService.playSuccess(settings.soundEffects);
   };
 
@@ -801,48 +842,77 @@ export const NotesManagerPanel: React.FC<NotesManagerPanelProps> = ({
           </div>
         ) : (
           <>
-            {/* Section 1: Pinned Notes */}
-            {pinnedNotes.length > 0 && (
-              <div>
-                <div className="flex items-center gap-2 mb-2.5">
-                  <Pin className="w-3.5 h-3.5 text-amber-400 fill-current" />
-                  <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
-                    Закреплённые карточки ({pinnedNotes.length})
-                  </h3>
-                </div>
-
-                <div
-                  className={
-                    viewMode === 'grid'
-                      ? `grid gap-3.5 ${
-                          gridCols === 1
-                            ? 'grid-cols-1'
-                            : gridCols === 2
-                            ? 'grid-cols-1 md:grid-cols-2'
-                            : gridCols === 4
-                            ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
-                            : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
-                        }`
-                      : 'space-y-2'
-                  }
-                >
-                  {pinnedNotes.map((note) => renderNoteCard(note))}
-                </div>
-              </div>
-            )}
-
-            {/* Section 2: Other Notes */}
-            {otherNotes.length > 0 && (
-              <div>
+            {sortMode === 'pinned' ? (
+              <>
+                {/* Section 1: Pinned Notes */}
                 {pinnedNotes.length > 0 && (
-                  <div className="flex items-center gap-2 mb-2.5 pt-2">
-                    <Layers className="w-3.5 h-3.5 text-slate-400" />
-                    <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-                      Все заметки ({otherNotes.length})
-                    </h3>
+                  <div>
+                    <div className="flex items-center gap-2 mb-2.5">
+                      <Pin className="w-3.5 h-3.5 text-amber-400 fill-current" />
+                      <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                        Закреплённые карточки ({pinnedNotes.length})
+                      </h3>
+                    </div>
+
+                    <div
+                      className={
+                        viewMode === 'grid'
+                          ? `grid gap-3.5 ${
+                              gridCols === 1
+                                ? 'grid-cols-1'
+                                : gridCols === 2
+                                ? 'grid-cols-1 md:grid-cols-2'
+                                : gridCols === 4
+                                ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+                                : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+                            }`
+                          : 'space-y-2'
+                      }
+                    >
+                      <AnimatePresence mode="popLayout">
+                        {pinnedNotes.map((note) => renderNoteCard(note))}
+                      </AnimatePresence>
+                    </div>
                   </div>
                 )}
 
+                {/* Section 2: Other Notes */}
+                {otherNotes.length > 0 && (
+                  <div>
+                    {pinnedNotes.length > 0 && (
+                      <div className="flex items-center gap-2 mb-2.5 pt-2">
+                        <Layers className="w-3.5 h-3.5 text-slate-400" />
+                        <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+                          Все заметки ({otherNotes.length})
+                        </h3>
+                      </div>
+                    )}
+
+                    <div
+                      className={
+                        viewMode === 'grid'
+                          ? `grid gap-3.5 ${
+                              gridCols === 1
+                                ? 'grid-cols-1'
+                                : gridCols === 2
+                                ? 'grid-cols-1 md:grid-cols-2'
+                                : gridCols === 4
+                                ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+                                : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+                            }`
+                          : 'space-y-2'
+                      }
+                    >
+                      <AnimatePresence mode="popLayout">
+                        {otherNotes.map((note) => renderNoteCard(note))}
+                      </AnimatePresence>
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              /* Custom / Date / Title / Color sort: Fluid responsive grid */
+              <div>
                 <div
                   className={
                     viewMode === 'grid'
@@ -858,7 +928,9 @@ export const NotesManagerPanel: React.FC<NotesManagerPanelProps> = ({
                       : 'space-y-2'
                   }
                 >
-                  {otherNotes.map((note) => renderNoteCard(note))}
+                  <AnimatePresence mode="popLayout">
+                    {sortedNotes.map((note) => renderNoteCard(note))}
+                  </AnimatePresence>
                 </div>
               </div>
             )}
@@ -937,6 +1009,12 @@ export const NotesManagerPanel: React.FC<NotesManagerPanelProps> = ({
     const isInlineEditing = inlineEditingNoteId === note.id;
     const cardSaveState = inlineSaveStatus[note.id];
 
+    const cardIndex = sortedNotes.findIndex((n) => n.id === note.id);
+    const isFirst = cardIndex === 0;
+    const isLast = cardIndex === sortedNotes.length - 1;
+    const isHoveredTarget = dropTarget?.id === note.id;
+    const isJustMoved = recentMovedNoteId === note.id;
+
     if (viewMode === 'list') {
       if (isInlineEditing) {
         return (
@@ -1003,10 +1081,39 @@ export const NotesManagerPanel: React.FC<NotesManagerPanelProps> = ({
       }
 
       return (
-        <div
+        <motion.div
+          layout
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95 }}
+          transition={{ type: 'spring', stiffness: 350, damping: 28 }}
+          whileHover={{ y: -1.5, transition: { duration: 0.15 } }}
           key={note.id}
-          className={`p-3 rounded-xl border transition-all flex items-start justify-between gap-3 ${style.cardBg} ${style.cardBorder}`}
+          draggable={sortMode === 'custom' && !isInlineEditing}
+          onDragStart={(e) => handleDragStart(note.id, e as unknown as React.DragEvent)}
+          onDragOver={(e) => handleDragOverNote(note.id, e as unknown as React.DragEvent)}
+          onDragLeave={(e) => handleDragLeaveNote(note.id, e as unknown as React.DragEvent)}
+          onDrop={(e) => handleDropOnNote(note.id, e as unknown as React.DragEvent)}
+          className={`p-3 rounded-xl border relative transition-colors duration-150 flex items-start justify-between gap-3 ${style.cardBg} ${style.cardBorder} ${
+            draggingNoteId === note.id
+              ? 'opacity-35 border-sky-400 border-dashed bg-sky-950/20'
+              : isJustMoved
+              ? 'border-emerald-400 ring-2 ring-emerald-400/80 bg-emerald-500/10'
+              : isHoveredTarget
+              ? 'border-sky-400 ring-2 ring-sky-400/50'
+              : ''
+          }`}
         >
+          {isHoveredTarget && (
+            <>
+              {dropTarget.position === 'before' ? (
+                <div className="absolute -top-1 left-0 right-0 h-1 bg-gradient-to-r from-sky-400 to-indigo-500 rounded-full shadow-[0_0_12px_#38bdf8] animate-pulse z-30 pointer-events-none" />
+              ) : (
+                <div className="absolute -bottom-1 left-0 right-0 h-1 bg-gradient-to-r from-sky-400 to-indigo-500 rounded-full shadow-[0_0_12px_#38bdf8] animate-pulse z-30 pointer-events-none" />
+              )}
+            </>
+          )}
+
           <div className="flex-1 min-w-0 space-y-1">
             <div className="flex items-center gap-2">
               <span className={`w-2 h-2 rounded-full shrink-0 ${style.dotColor}`}></span>
@@ -1091,30 +1198,59 @@ export const NotesManagerPanel: React.FC<NotesManagerPanelProps> = ({
               <Trash2 className="w-3.5 h-3.5" />
             </button>
           </div>
-        </div>
+        </motion.div>
       );
     }
 
     // Grid / Bento Card View
-    const cardIndex = sortedNotes.findIndex((n) => n.id === note.id);
-    const isFirst = cardIndex === 0;
-    const isLast = cardIndex === sortedNotes.length - 1;
-
     return (
-      <div
+      <motion.div
+        layout
+        initial={{ opacity: 0, scale: 0.96 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.94 }}
+        transition={{ type: 'spring', stiffness: 350, damping: 28 }}
+        whileHover={{ y: -2.5, transition: { duration: 0.15 } }}
+        whileTap={{ scale: 0.985 }}
         key={note.id}
         draggable={sortMode === 'custom' && !isInlineEditing}
-        onDragStart={(e) => handleDragStart(note.id, e)}
-        onDragOver={(e) => e.preventDefault()}
-        onDrop={(e) => handleDropOnNote(note.id, e)}
-        className={`rounded-xl border flex flex-col justify-between transition-all shadow-md group ${
+        onDragStart={(e) => handleDragStart(note.id, e as unknown as React.DragEvent)}
+        onDragOver={(e) => handleDragOverNote(note.id, e as unknown as React.DragEvent)}
+        onDragLeave={(e) => handleDragLeaveNote(note.id, e as unknown as React.DragEvent)}
+        onDrop={(e) => handleDropOnNote(note.id, e as unknown as React.DragEvent)}
+        className={`rounded-xl border relative flex flex-col justify-between transition-colors duration-150 shadow-md group ${
           cardDensity === 'compact' ? 'p-2.5' : 'p-3.5'
         } ${style.cardBg} ${style.cardBorder} ${
           isInlineEditing ? 'ring-1 ring-sky-500/50' : ''
         } ${
-          draggingNoteId === note.id ? 'opacity-40 border-sky-400 border-dashed scale-98' : ''
+          draggingNoteId === note.id
+            ? 'opacity-35 border-sky-400 border-dashed scale-[0.98] bg-sky-950/20 shadow-none'
+            : isJustMoved
+            ? 'border-emerald-400 ring-2 ring-emerald-400/80 bg-emerald-500/10 shadow-lg scale-[1.01]'
+            : isHoveredTarget
+            ? 'border-sky-400 ring-2 ring-sky-400/50 shadow-xl'
+            : ''
         }`}
       >
+        {/* Visual future placement indicator */}
+        {isHoveredTarget && (
+          <>
+            {dropTarget.position === 'before' ? (
+              <div className="absolute -left-1.5 top-0 bottom-0 w-1.5 bg-gradient-to-b from-sky-400 to-indigo-500 rounded-full shadow-[0_0_12px_#38bdf8] animate-pulse z-30 pointer-events-none" />
+            ) : (
+              <div className="absolute -right-1.5 top-0 bottom-0 w-1.5 bg-gradient-to-b from-sky-400 to-indigo-500 rounded-full shadow-[0_0_12px_#38bdf8] animate-pulse z-30 pointer-events-none" />
+            )}
+            <div
+              className={`absolute -top-3.5 ${
+                dropTarget.position === 'before' ? 'left-1' : 'right-1'
+              } px-2 py-0.5 rounded-full bg-sky-500 text-white text-[9px] font-bold shadow-lg z-40 pointer-events-none flex items-center gap-1 animate-bounce`}
+            >
+              <Sparkles className="w-2.5 h-2.5" />
+              <span>{dropTarget.position === 'before' ? 'Вставить перед' : 'Вставить после'}</span>
+            </div>
+          </>
+        )}
+
         {/* Card Header */}
         <div>
           <div className="flex items-start justify-between gap-2 mb-2">
@@ -1353,7 +1489,7 @@ export const NotesManagerPanel: React.FC<NotesManagerPanelProps> = ({
             <span className="text-[10.5px]">{isCopied ? 'Скопировано' : 'Копировать'}</span>
           </button>
         </div>
-      </div>
+      </motion.div>
     );
   }
 };
