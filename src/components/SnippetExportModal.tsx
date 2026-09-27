@@ -86,7 +86,18 @@ export const SnippetExportModal: React.FC<SnippetExportModalProps> = ({
     return JSON.stringify(exportObject, null, 2);
   }, [exportObject]);
 
-  if (!isOpen) return null;
+  // Group snippet count by category for helper list
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const c of availableCategories) {
+      if (c === 'Все') {
+        counts[c] = snippets.length;
+      } else {
+        counts[c] = snippets.filter((s) => s.category === c).length;
+      }
+    }
+    return counts;
+  }, [availableCategories, snippets]);
 
   // Sanitize filename slug
   const getDownloadFilename = () => {
@@ -134,18 +145,7 @@ export const SnippetExportModal: React.FC<SnippetExportModalProps> = ({
     setTimeout(() => setIsCopied(false), 2000);
   };
 
-  // Group snippet count by category for helper list
-  const categoryCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
-    for (const c of availableCategories) {
-      if (c === 'Все') {
-        counts[c] = snippets.length;
-      } else {
-        counts[c] = snippets.filter((s) => s.category === c).length;
-      }
-    }
-    return counts;
-  }, [availableCategories, snippets]);
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">

@@ -611,17 +611,19 @@ export const PlaceholderManagerPanel: React.FC<PlaceholderManagerPanelProps> = (
       />
 
       {/* Conditional Placeholder Builder Modal */}
-      <ConditionalPlaceholderBuilderModal
-        isOpen={isConditionalBuilderOpen}
-        onClose={() => setIsConditionalBuilderOpen(false)}
-        placeholders={placeholders}
-        onApplyToField={(syntax) => {
-          setFormDefaultVal(syntax);
-          if (formType !== 'text') setFormType('text');
-        }}
-        onSaveAsPlaceholder={handleSaveConditionAsPlaceholder}
-        settings={settings}
-      />
+      {isConditionalBuilderOpen && (
+        <ConditionalPlaceholderBuilderModal
+          isOpen={isConditionalBuilderOpen}
+          onClose={() => setIsConditionalBuilderOpen(false)}
+          placeholders={placeholders}
+          onApplyToField={(syntax) => {
+            setFormDefaultVal(syntax);
+            if (formType !== 'text') setFormType('text');
+          }}
+          onSaveAsPlaceholder={handleSaveConditionAsPlaceholder}
+          settings={settings}
+        />
+      )}
     </div>
   );
 };

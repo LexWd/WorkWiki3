@@ -7,6 +7,13 @@ export const GITHUB_PAGE_URL = 'https://lexwd.github.io/WorkWiki3/';
 export const GITHUB_ACTIONS_URL = 'https://github.com/lexwd/WorkWiki3/actions';
 export const GITHUB_SETUP_DOWNLOAD_URL = 'https://lexwd.github.io/WorkWiki3/WorkWiki-3-Setup.exe';
 
+export interface ParsedVersion {
+  parts: number[];
+  build: number;
+  prerelease: string | null;
+  raw: string;
+}
+
 export interface VersionInfo {
   version: string;
   buildDate?: string;
@@ -17,6 +24,7 @@ export interface VersionInfo {
   exeUrl?: string;
   pageUrl?: string;
   actionsUrl?: string;
+  source?: string;
 }
 
 export interface UpdateCheckResult {
@@ -33,18 +41,69 @@ export interface UpdateCheckResult {
   isElectron: boolean;
   checkFailed?: boolean;
   errorMessage?: string;
+  cached?: boolean;
 }
 
-export function compareSemver(current: string, target: string): number {
-  const cParts = current.replace(/^v/, '').split('.').map((n) => parseInt(n, 10) || 0);
-  const tParts = target.replace(/^v/, '').split('.').map((n) => parseInt(n, 10) || 0);
+/**
+ * Robust semver parser:
+ * Handles: "2.3.1", "v2.3.1", "2.3.1+1", "2.3.1.1", "v2.3.2-beta", etc.
+ */
+export function parseVersion(v: string): ParsedVersion {
+  if (!v) return { parts: [0], build: 0, prerelease: null, raw: '' };
+  const raw = String(v).trim();
+  let cleaned = raw.replace(/^v/i, '').trim();
 
-  for (let i = 0; i < Math.max(cParts.length, tParts.length); i++) {
-    const c = cParts[i] || 0;
-    const t = tParts[i] || 0;
-    if (t > c) return 1; // target is newer
-    if (t < c) return -1;
+  // Extract build metadata e.g. "+1", "+build23"
+  let build = 0;
+  if (cleaned.includes('+')) {
+    const [base, b] = cleaned.split('+');
+    cleaned = base;
+    build = parseInt(b, 10) || 0;
   }
+
+  // Extract prerelease e.g. "-alpha", "-beta.1"
+  let prerelease: string | null = null;
+  if (cleaned.includes('-')) {
+    const [base, pre] = cleaned.split('-');
+    cleaned = base;
+    prerelease = pre;
+  }
+
+  // Extract all numeric segments (e.g. 2.3.1 or 2.3.1.1)
+  const parts = cleaned.split('.').map((p) => parseInt(p, 10) || 0);
+
+  return { parts, build, prerelease, raw };
+}
+
+/**
+ * Compares two semantic versions.
+ * Returns:
+ *   1 if target > current (target is strictly newer -> update available)
+ *  -1 if target < current (target is older)
+ *   0 if target == current (identical -> no update needed)
+ */
+export function compareSemver(current: string, target: string): number {
+  const c = parseVersion(current);
+  const t = parseVersion(target);
+
+  const maxLen = Math.max(c.parts.length, t.parts.length);
+  for (let i = 0; i < maxLen; i++) {
+    const cp = c.parts[i] || 0;
+    const tp = t.parts[i] || 0;
+    if (tp !== cp) {
+      return tp > cp ? 1 : -1;
+    }
+  }
+
+  // If major.minor.patch are equal, compare build number (e.g. 2.3.1+2 > 2.3.1+1 > 2.3.1)
+  if (t.build !== c.build) {
+    return t.build > c.build ? 1 : -1;
+  }
+
+  // If numeric parts and build are equal, a release is newer than a prerelease (2.3.1 > 2.3.1-beta)
+  if (c.prerelease && !t.prerelease) return 1;
+  if (!c.prerelease && t.prerelease) return -1;
+
   return 0;
 }
 
@@ -70,6 +129,12 @@ async function fetchWithTimeout(url: string, timeoutMs = 3200): Promise<Response
     clearTimeout(id);
   }
 }
+
+// In-flight promise deduplication and cooldown cache to prevent loop-fetching
+let inFlightCheckPromise: Promise<UpdateCheckResult> | null = null;
+let lastCheckTime = 0;
+let lastCheckResult: UpdateCheckResult | null = null;
+const CACHE_TTL_MS = 10000; // 10-second deduplication cache
 
 export const updateManager = {
   getCurrentVersion(): string {
@@ -105,24 +170,51 @@ export const updateManager = {
   },
 
   /**
-   * Multi-source check for updates across GitHub Pages CDN, Raw GitHub repo and local host:
-   * 1. Electron Native IPC bridge
-   * 2. GitHub Pages CDN mirror (lexwd.github.io/WorkWiki3/version.json)
-   * 3. Raw GitHub repository main branch (raw.githubusercontent.com)
-   * 4. Current host's local `/version.json` (for web/PWA deployed instances)
+   * Resilient, loop-protected check for updates:
+   * 1. Returns cached result if called repeatedly within 10 seconds (unless forced)
+   * 2. Deduplicates concurrent in-flight requests to a single Promise
+   * 3. Queries repository actions, GitHub Pages manifest, raw repo branch and repository tags
+   * 4. Accurately compares against CURRENT_APP_VERSION (2.3.1)
    */
-  async checkForUpdates(): Promise<UpdateCheckResult> {
+  async checkForUpdates(force = false): Promise<UpdateCheckResult> {
+    const now = Date.now();
+
+    // Loop prevention 1: Return fresh cache if within TTL and not explicitly forced
+    if (!force && lastCheckResult && now - lastCheckTime < CACHE_TTL_MS) {
+      return { ...lastCheckResult, cached: true };
+    }
+
+    // Loop prevention 2: In-flight deduplication (join existing network request)
+    if (inFlightCheckPromise) {
+      return inFlightCheckPromise;
+    }
+
+    inFlightCheckPromise = (async () => {
+      try {
+        const result = await this.executeMultiSourceCheck();
+        lastCheckResult = result;
+        lastCheckTime = Date.now();
+        return result;
+      } finally {
+        inFlightCheckPromise = null;
+      }
+    })();
+
+    return inFlightCheckPromise;
+  },
+
+  async executeMultiSourceCheck(): Promise<UpdateCheckResult> {
     const isElectron = this.isElectronApp();
     const fetchedResults: VersionInfo[] = [];
 
-    // Source A: Electron native HTTPS check
+    // Source A: Electron native HTTPS bridge
     const electronPromise = (async (): Promise<VersionInfo | null> => {
       if (typeof window !== 'undefined' && window.electronAPI?.checkForUpdates) {
         try {
           const res = await window.electronAPI.checkForUpdates();
           if (res && res.latestVersion) {
             return {
-              version: res.latestVersion,
+              version: String(res.latestVersion).trim(),
               buildDate: res.buildDate,
               title: res.title,
               features: res.releaseNotes ? res.releaseNotes.split('\n').filter(Boolean) : [],
@@ -130,6 +222,7 @@ export const updateManager = {
               exeUrl: res.exeUrl || GITHUB_SETUP_DOWNLOAD_URL,
               pageUrl: GITHUB_PAGE_URL,
               actionsUrl: GITHUB_ACTIONS_URL,
+              source: 'electron-ipc',
             };
           }
         } catch (err) {
@@ -139,23 +232,22 @@ export const updateManager = {
       return null;
     })();
 
-    // Source B: Web candidate mirrors (GitHub Pages CDN first, then Raw GitHub, then local)
+    // Source B: GitHub Pages CDN & Raw GitHub Repository
     const baseUrl = typeof window !== 'undefined' && import.meta.env.BASE_URL ? import.meta.env.BASE_URL : './';
     const localVersionPath = baseUrl.endsWith('/') ? `${baseUrl}version.json` : `${baseUrl}/version.json`;
 
     const webCandidates = [
-      'https://lexwd.github.io/WorkWiki3/version.json',
-      'https://raw.githubusercontent.com/lexwd/WorkWiki3/main/public/version.json',
+      { url: 'https://lexwd.github.io/WorkWiki3/version.json', source: 'github-pages' },
+      { url: 'https://raw.githubusercontent.com/lexwd/WorkWiki3/main/public/version.json', source: 'github-raw' },
     ];
 
-    // Only add local host path if running over http/https (skip inside file://)
     if (typeof window !== 'undefined' && window.location.protocol.startsWith('http')) {
-      webCandidates.push(localVersionPath);
+      webCandidates.push({ url: localVersionPath, source: 'local-host' });
     }
 
-    const webPromises = webCandidates.map(async (url): Promise<VersionInfo | null> => {
+    const webPromises = webCandidates.map(async (item): Promise<VersionInfo | null> => {
       try {
-        const res = await fetchWithTimeout(url, 3200);
+        const res = await fetchWithTimeout(item.url, 3200);
         if (!res.ok) return null;
         const data = await res.json();
         if (data && data.version) {
@@ -168,18 +260,52 @@ export const updateManager = {
             exeUrl: data.exeUrl || GITHUB_SETUP_DOWNLOAD_URL,
             pageUrl: data.pageUrl || GITHUB_PAGE_URL,
             actionsUrl: data.actionsUrl || GITHUB_ACTIONS_URL,
+            source: item.source,
           };
         }
       } catch {
-        // Silently catch individual mirror timeout or network errors
+        // Silently ignore individual mirror timeout
       }
       return null;
     });
 
-    // Run all checks in parallel
+    // Source C: Repository Tags from GitHub API (identifies tags like v2.3.2, 2.3.1.1, etc.)
+    const tagsPromise = (async (): Promise<VersionInfo | null> => {
+      try {
+        const res = await fetchWithTimeout('https://api.github.com/repos/lexwd/WorkWiki3/tags', 3000);
+        if (!res.ok) return null;
+        const tags = await res.json();
+        if (Array.isArray(tags) && tags.length > 0) {
+          // Sort tags by semver descending
+          const sortedTags = tags
+            .filter((t) => t && t.name)
+            .sort((a, b) => compareSemver(a.name, b.name));
+
+          const latestTag = sortedTags[sortedTags.length - 1];
+          if (latestTag && latestTag.name) {
+            const cleanTag = latestTag.name.replace(/^v/i, '').trim();
+            return {
+              version: cleanTag,
+              title: `WorkWiki 3 v${cleanTag}`,
+              downloadUrl: GITHUB_SETUP_DOWNLOAD_URL,
+              exeUrl: GITHUB_SETUP_DOWNLOAD_URL,
+              pageUrl: GITHUB_PAGE_URL,
+              actionsUrl: GITHUB_ACTIONS_URL,
+              source: 'github-tags',
+            };
+          }
+        }
+      } catch {
+        // API rate-limit or network errors silently handled
+      }
+      return null;
+    })();
+
+    // Run all checks in parallel with Promise.allSettled
     const allResults = await Promise.allSettled([
       electronPromise,
       ...webPromises,
+      tagsPromise,
     ]);
 
     for (const r of allResults) {
@@ -204,10 +330,12 @@ export const updateManager = {
       };
     }
 
-    // Sort to pick the absolute highest version found across all mirrors
+    // Sort to identify the absolute highest version among all mirrors and tags
     fetchedResults.sort((a, b) => compareSemver(a.version, b.version));
     const highest = fetchedResults[fetchedResults.length - 1];
 
+    // Compare with CURRENT_APP_VERSION (2.3.1)
+    // Only true if highest.version is strictly newer than CURRENT_APP_VERSION
     const hasUpdate = compareSemver(CURRENT_APP_VERSION, highest.version) > 0;
 
     return {
@@ -236,19 +364,16 @@ export const updateManager = {
    */
   async applyUpdateAndReload(targetVersion?: string): Promise<void> {
     try {
-      // Step 1: Create automated backup point before applying new version
       try {
         storage.createAutoBackup(`Резервная копия перед обновлением до v${targetVersion || CURRENT_APP_VERSION}`);
       } catch (backupErr) {
         console.warn('Backup before update warning:', backupErr);
       }
 
-      // Step 2: Set flag in sessionStorage to notify user upon reload
       if (typeof window !== 'undefined' && window.sessionStorage) {
         window.sessionStorage.setItem('workwiki_just_updated', targetVersion || CURRENT_APP_VERSION);
       }
 
-      // Step 3: Clear outdated CacheStorage in browser / PWA
       if (typeof window !== 'undefined' && 'caches' in window) {
         try {
           const keys = await caches.keys();
@@ -258,7 +383,6 @@ export const updateManager = {
         }
       }
 
-      // Step 4: Service Worker update trigger & skip waiting
       if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
         try {
           const registrations = await navigator.serviceWorker.getRegistrations();
@@ -276,13 +400,11 @@ export const updateManager = {
         }
       }
 
-      // Step 5: If in Electron desktop environment
       if (typeof window !== 'undefined' && window.electronAPI?.applyUpdateAndReload) {
         await window.electronAPI.applyUpdateAndReload();
         return;
       }
 
-      // Step 6: Hard reload with cache-buster parameter in Web/PWA
       if (typeof window !== 'undefined') {
         const cleanUrl = window.location.origin + window.location.pathname;
         window.location.href = `${cleanUrl}?_update=${Date.now()}`;
@@ -295,9 +417,6 @@ export const updateManager = {
     }
   },
 
-  /**
-   * Electron-specific .exe downloader with real-time progress
-   */
   async downloadExeUpdate(
     url: string,
     fileName?: string
@@ -308,9 +427,6 @@ export const updateManager = {
     return { success: false, error: 'Доступно только в настольном приложении Windows' };
   },
 
-  /**
-   * Launches newly downloaded .exe and closes the current application
-   */
   async installExeUpdate(filePath: string): Promise<boolean> {
     if (typeof window !== 'undefined' && window.electronAPI?.installUpdateAndRestart) {
       return await window.electronAPI.installUpdateAndRestart(filePath);
@@ -320,9 +436,6 @@ export const updateManager = {
     return false;
   },
 
-  /**
-   * 1-Click Update and Restart: closes current app, runs Setup silently (/S), and automatically relaunches new version
-   */
   async installUpdateAndRestart(installerPath: string): Promise<boolean> {
     if (typeof window !== 'undefined' && window.electronAPI?.installUpdateAndRestart) {
       return await window.electronAPI.installUpdateAndRestart(installerPath);
@@ -332,9 +445,6 @@ export const updateManager = {
     return false;
   },
 
-  /**
-   * Opens the download folder in Windows Explorer
-   */
   async openDownloadedFolder(filePath?: string): Promise<boolean> {
     if (typeof window !== 'undefined' && window.electronAPI?.openDownloadedFolder) {
       return await window.electronAPI.openDownloadedFolder(filePath || '');
@@ -343,5 +453,5 @@ export const updateManager = {
   },
 };
 
-export const checkForUpdate = () => updateManager.checkForUpdates();
-export const checkForUpdates = () => updateManager.checkForUpdates();
+export const checkForUpdate = (force = false) => updateManager.checkForUpdates(force);
+export const checkForUpdates = (force = false) => updateManager.checkForUpdates(force);

@@ -1062,13 +1062,15 @@ export const SnippetEditorModal: React.FC<SnippetEditorModalProps> = ({
       </div>
 
       {/* Conditional Placeholder Builder Modal */}
-      <ConditionalPlaceholderBuilderModal
-        isOpen={isConditionalBuilderOpen}
-        onClose={() => setIsConditionalBuilderOpen(false)}
-        placeholders={placeholders}
-        onInsertSnippet={(syntax) => handleInsertRawToken(syntax)}
-        settings={settings}
-      />
+      {isConditionalBuilderOpen && (
+        <ConditionalPlaceholderBuilderModal
+          isOpen={isConditionalBuilderOpen}
+          onClose={() => setIsConditionalBuilderOpen(false)}
+          placeholders={placeholders}
+          onInsertSnippet={(syntax) => handleInsertRawToken(syntax)}
+          settings={settings}
+        />
+      )}
     </div>
   );
 };

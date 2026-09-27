@@ -67,8 +67,6 @@ export const SnippetImportModal: React.FC<SnippetImportModalProps> = ({
   const theme = getThemeClasses(settings.theme);
   const accent = getAccentClasses(settings.accentColor);
 
-  if (!isOpen) return null;
-
   // Parser helper function
   const parseJsonContent = (jsonString: string, sourceName?: string) => {
     setParseError(null);
@@ -271,6 +269,8 @@ export const SnippetImportModal: React.FC<SnippetImportModalProps> = ({
   const selectableExistingCategories = useMemo(() => {
     return availableCategories.filter((c) => c !== 'Все');
   }, [availableCategories]);
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">

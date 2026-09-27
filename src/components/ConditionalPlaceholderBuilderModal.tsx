@@ -93,14 +93,14 @@ const PRESETS: PresetItem[] = [
 export const ConditionalPlaceholderBuilderModal: React.FC<ConditionalPlaceholderBuilderModalProps> = ({
   isOpen,
   onClose,
-  placeholders,
+  placeholders = [],
   onInsertSnippet,
   onApplyToField,
   onSaveAsPlaceholder,
   settings,
 }) => {
   const [selectedVariable, setSelectedVariable] = useState<string>(() => {
-    return placeholders[0]?.key || 'имя_клиента';
+    return placeholders?.[0]?.key || 'имя_клиента';
   });
   const [customVariable, setCustomVariable] = useState('');
   const [operator, setOperator] = useState<OperatorType>('exists');
@@ -112,16 +112,14 @@ export const ConditionalPlaceholderBuilderModal: React.FC<ConditionalPlaceholder
   const [testValue, setTestValue] = useState('');
   const [copied, setCopied] = useState(false);
 
-  if (!isOpen) return null;
-
-  const theme = getThemeClasses(settings.theme);
-  const accent = getAccentClasses(settings.accentColor);
+  const theme = getThemeClasses(settings?.theme);
+  const accent = getAccentClasses(settings?.accentColor);
 
   const activeVariableKey = customVariable.trim() || selectedVariable;
 
   // Selected placeholder config if exists
-  const selectedConfig = placeholders.find(
-    (p) => p.key.toLowerCase() === activeVariableKey.toLowerCase()
+  const selectedConfig = (placeholders || []).find(
+    (p) => p?.key && p.key.toLowerCase() === activeVariableKey.toLowerCase()
   );
 
   // Generate conditional expression string
@@ -154,12 +152,12 @@ export const ConditionalPlaceholderBuilderModal: React.FC<ConditionalPlaceholder
     };
     return evaluateCondition(
       conditionExpression,
-      placeholders,
+      placeholders || [],
       null,
-      settings.agentName,
+      settings?.agentName,
       overrides
     );
-  }, [conditionExpression, activeVariableKey, testValue, placeholders, settings.agentName]);
+  }, [conditionExpression, activeVariableKey, testValue, placeholders, settings?.agentName]);
 
   const simulatedOutput = evaluation.matched ? ifTrueText : ifFalseText;
 
@@ -190,6 +188,8 @@ export const ConditionalPlaceholderBuilderModal: React.FC<ConditionalPlaceholder
     setTestValue(preset.compareValue || 'Тестовое значение');
     soundService.playClick(settings.soundEffects);
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-xs animate-in fade-in duration-150">
