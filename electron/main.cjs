@@ -281,9 +281,8 @@ ipcMain.handle('get-app-version', () => {
 ipcMain.handle('check-for-updates', async () => {
   const https = require('https');
   const urls = [
-    'https://raw.githubusercontent.com/lexwd/WorkWiki3/main/public/version.json',
     'https://lexwd.github.io/WorkWiki3/version.json',
-    'https://api.github.com/repos/lexwd/WorkWiki3/releases/latest',
+    'https://raw.githubusercontent.com/lexwd/WorkWiki3/main/public/version.json',
   ];
 
   const fetchJson = (url) =>
@@ -292,7 +291,7 @@ ipcMain.handle('check-for-updates', async () => {
         url,
         {
           headers: {
-            'User-Agent': `WorkWiki3/${app.getVersion() || '2.3.0'}`,
+            'User-Agent': `WorkWiki3/${app.getVersion() || '2.3.1'}`,
             'Cache-Control': 'no-cache',
             Accept: 'application/json',
           },
@@ -328,26 +327,16 @@ ipcMain.handle('check-for-updates', async () => {
   for (const attempt of attempts) {
     if (attempt.status === 'fulfilled' && attempt.value) {
       const data = attempt.value;
-      // Handle either version.json or GitHub Release payload
-      if (data.version) {
+      if (data && data.version) {
         return {
           latestVersion: data.version,
           buildDate: data.buildDate,
           title: data.title || `WorkWiki 3 v${data.version}`,
           releaseNotes: Array.isArray(data.features) ? data.features.join('\n') : (data.releaseNotes || ''),
-          downloadUrl: data.downloadUrl || 'https://github.com/lexwd/WorkWiki3/releases',
-          exeUrl: data.exeUrl,
-        };
-      } else if (data.tag_name) {
-        const ver = data.tag_name.replace(/^v/, '');
-        const exeAsset = Array.isArray(data.assets) ? data.assets.find((a) => a.name && a.name.endsWith('.exe')) : null;
-        return {
-          latestVersion: ver,
-          buildDate: data.published_at ? data.published_at.slice(0, 10) : undefined,
-          title: data.name || `WorkWiki 3 v${ver}`,
-          releaseNotes: data.body || '',
-          downloadUrl: data.html_url || 'https://github.com/lexwd/WorkWiki3/releases',
-          exeUrl: exeAsset ? exeAsset.browser_download_url : undefined,
+          downloadUrl: data.downloadUrl || 'https://lexwd.github.io/WorkWiki3/WorkWiki-3-Setup.exe',
+          exeUrl: data.exeUrl || 'https://lexwd.github.io/WorkWiki3/WorkWiki-3-Setup.exe',
+          pageUrl: data.pageUrl || 'https://lexwd.github.io/WorkWiki3/',
+          actionsUrl: data.actionsUrl || 'https://github.com/lexwd/WorkWiki3/actions',
         };
       }
     }

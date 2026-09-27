@@ -27,10 +27,12 @@
 
 ---
 
-## ☁️ Сборка через GitHub Actions
+## ☁️ Сборка через GitHub Actions и деплой на GitHub Pages
 
-1. Сделайте Push в ваш GitHub-репозиторий или запустите вручную в разделе **Actions** -> **Build Windows Executables**.
-2. Workflow соберет актуальный `WorkWiki-3-Setup-*.exe` и прикрепит его к релизу или артефактам сборки.
+1. Сделайте Push в ваш GitHub-репозиторий или запустите вручную в разделе **Actions** -> **Build Windows Executables & Deploy to Pages**.
+2. Workflow автоматически соберет актуальный `WorkWiki-3-Setup-*.exe`:
+   - Загрузит его в артефакты **GitHub Actions** (`WorkWiki-3-Windows-x64`);
+   - Опубликует на **GitHub Pages** (`https://lexwd.github.io/WorkWiki3/WorkWiki-3-Setup.exe`), откуда десктопное приложение скачивает его при обновлении в 1 клик!
 
 ---
 

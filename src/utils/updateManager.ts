@@ -1,9 +1,11 @@
 import { storage } from './storage';
 
-export const CURRENT_APP_VERSION = '2.3.0';
+export const CURRENT_APP_VERSION = '2.3.1';
 export const BUILD_DATE = '2026-09-27';
 export const GITHUB_REPO_URL = 'https://github.com/lexwd/WorkWiki3';
-export const GITHUB_RELEASES_URL = 'https://github.com/lexwd/WorkWiki3/releases';
+export const GITHUB_PAGE_URL = 'https://lexwd.github.io/WorkWiki3/';
+export const GITHUB_ACTIONS_URL = 'https://github.com/lexwd/WorkWiki3/actions';
+export const GITHUB_SETUP_DOWNLOAD_URL = 'https://lexwd.github.io/WorkWiki3/WorkWiki-3-Setup.exe';
 
 export interface VersionInfo {
   version: string;
@@ -13,6 +15,8 @@ export interface VersionInfo {
   features?: string[];
   downloadUrl?: string;
   exeUrl?: string;
+  pageUrl?: string;
+  actionsUrl?: string;
 }
 
 export interface UpdateCheckResult {
@@ -24,6 +28,8 @@ export interface UpdateCheckResult {
   features: string[];
   downloadUrl?: string;
   exeUrl?: string;
+  pageUrl?: string;
+  actionsUrl?: string;
   isElectron: boolean;
   checkFailed?: boolean;
   errorMessage?: string;
@@ -74,8 +80,16 @@ export const updateManager = {
     return BUILD_DATE;
   },
 
-  getReleasesUrl(): string {
-    return GITHUB_RELEASES_URL;
+  getPageUrl(): string {
+    return GITHUB_PAGE_URL;
+  },
+
+  getActionsUrl(): string {
+    return GITHUB_ACTIONS_URL;
+  },
+
+  getSetupDownloadUrl(): string {
+    return GITHUB_SETUP_DOWNLOAD_URL;
   },
 
   isElectronApp(): boolean {
@@ -91,18 +105,17 @@ export const updateManager = {
   },
 
   /**
-   * Performs an ultra-fast, resilient multi-source check for updates across:
-   * 1. Electron Native IPC bridge (if running in desktop container)
-   * 2. Raw GitHub repository branch manifest
-   * 3. GitHub Pages CDN mirror
+   * Multi-source check for updates across GitHub Pages CDN, Raw GitHub repo and local host:
+   * 1. Electron Native IPC bridge
+   * 2. GitHub Pages CDN mirror (lexwd.github.io/WorkWiki3/version.json)
+   * 3. Raw GitHub repository main branch (raw.githubusercontent.com)
    * 4. Current host's local `/version.json` (for web/PWA deployed instances)
-   * 5. GitHub Releases REST API (extracts direct .exe asset URLs)
    */
   async checkForUpdates(): Promise<UpdateCheckResult> {
     const isElectron = this.isElectronApp();
     const fetchedResults: VersionInfo[] = [];
 
-    // Source A: Electron native HTTPS check (runs in main node process with custom user-agent)
+    // Source A: Electron native HTTPS check
     const electronPromise = (async (): Promise<VersionInfo | null> => {
       if (typeof window !== 'undefined' && window.electronAPI?.checkForUpdates) {
         try {
@@ -113,8 +126,10 @@ export const updateManager = {
               buildDate: res.buildDate,
               title: res.title,
               features: res.releaseNotes ? res.releaseNotes.split('\n').filter(Boolean) : [],
-              downloadUrl: res.downloadUrl || GITHUB_RELEASES_URL,
-              exeUrl: res.exeUrl,
+              downloadUrl: res.downloadUrl || GITHUB_SETUP_DOWNLOAD_URL,
+              exeUrl: res.exeUrl || GITHUB_SETUP_DOWNLOAD_URL,
+              pageUrl: GITHUB_PAGE_URL,
+              actionsUrl: GITHUB_ACTIONS_URL,
             };
           }
         } catch (err) {
@@ -124,13 +139,13 @@ export const updateManager = {
       return null;
     })();
 
-    // Source B: Web candidate mirrors (fetched in parallel with strict 3.2s timeout)
+    // Source B: Web candidate mirrors (GitHub Pages CDN first, then Raw GitHub, then local)
     const baseUrl = typeof window !== 'undefined' && import.meta.env.BASE_URL ? import.meta.env.BASE_URL : './';
     const localVersionPath = baseUrl.endsWith('/') ? `${baseUrl}version.json` : `${baseUrl}/version.json`;
 
     const webCandidates = [
-      'https://raw.githubusercontent.com/lexwd/WorkWiki3/main/public/version.json',
       'https://lexwd.github.io/WorkWiki3/version.json',
+      'https://raw.githubusercontent.com/lexwd/WorkWiki3/main/public/version.json',
     ];
 
     // Only add local host path if running over http/https (skip inside file://)
@@ -149,8 +164,10 @@ export const updateManager = {
             buildDate: data.buildDate,
             title: data.title || `WorkWiki 3 v${data.version}`,
             features: Array.isArray(data.features) ? data.features : [],
-            downloadUrl: data.downloadUrl || GITHUB_RELEASES_URL,
-            exeUrl: data.exeUrl,
+            downloadUrl: data.downloadUrl || GITHUB_SETUP_DOWNLOAD_URL,
+            exeUrl: data.exeUrl || GITHUB_SETUP_DOWNLOAD_URL,
+            pageUrl: data.pageUrl || GITHUB_PAGE_URL,
+            actionsUrl: data.actionsUrl || GITHUB_ACTIONS_URL,
           };
         }
       } catch {
@@ -159,39 +176,10 @@ export const updateManager = {
       return null;
     });
 
-    // Source C: GitHub Releases public API
-    const githubReleasePromise = (async (): Promise<VersionInfo | null> => {
-      try {
-        const res = await fetchWithTimeout('https://api.github.com/repos/lexwd/WorkWiki3/releases/latest', 3200);
-        if (!res.ok) return null;
-        const release = await res.json();
-        if (release && release.tag_name) {
-          const ver = release.tag_name.replace(/^v/, '');
-          const exeAsset = Array.isArray(release.assets)
-            ? release.assets.find((a: any) => a.name && a.name.toLowerCase().endsWith('.exe'))
-            : null;
-          return {
-            version: ver,
-            buildDate: release.published_at ? release.published_at.slice(0, 10) : undefined,
-            title: release.name || `WorkWiki 3 v${ver}`,
-            features: release.body
-              ? release.body.split('\n').map((s: string) => s.replace(/^[-*]\s*/, '').trim()).filter(Boolean)
-              : [],
-            downloadUrl: release.html_url || GITHUB_RELEASES_URL,
-            exeUrl: exeAsset ? exeAsset.browser_download_url : undefined,
-          };
-        }
-      } catch {
-        // Rate-limit or 404 is acceptable
-      }
-      return null;
-    })();
-
     // Run all checks in parallel
     const allResults = await Promise.allSettled([
       electronPromise,
       ...webPromises,
-      githubReleasePromise,
     ]);
 
     for (const r of allResults) {
@@ -206,10 +194,13 @@ export const updateManager = {
         currentVersion: CURRENT_APP_VERSION,
         latestVersion: CURRENT_APP_VERSION,
         features: [],
-        downloadUrl: GITHUB_RELEASES_URL,
+        downloadUrl: GITHUB_SETUP_DOWNLOAD_URL,
+        exeUrl: GITHUB_SETUP_DOWNLOAD_URL,
+        pageUrl: GITHUB_PAGE_URL,
+        actionsUrl: GITHUB_ACTIONS_URL,
         isElectron,
         checkFailed: true,
-        errorMessage: 'Не удалось связаться с серверами обновлений. Проверьте интернет-соединение или страницу релизов на GitHub.',
+        errorMessage: 'Не удалось связаться с серверами обновлений. Проверьте интернет-соединение, страницу GitHub Pages или раздел GitHub Actions.',
       };
     }
 
@@ -226,8 +217,10 @@ export const updateManager = {
       buildDate: highest.buildDate,
       title: highest.title,
       features: highest.features || [],
-      downloadUrl: highest.downloadUrl || GITHUB_RELEASES_URL,
-      exeUrl: highest.exeUrl,
+      downloadUrl: highest.downloadUrl || GITHUB_SETUP_DOWNLOAD_URL,
+      exeUrl: highest.exeUrl || GITHUB_SETUP_DOWNLOAD_URL,
+      pageUrl: highest.pageUrl || GITHUB_PAGE_URL,
+      actionsUrl: highest.actionsUrl || GITHUB_ACTIONS_URL,
       isElectron,
       checkFailed: false,
     };

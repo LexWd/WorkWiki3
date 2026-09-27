@@ -1,14 +1,25 @@
-name: Build Windows Executables
+name: Build Windows Executables & Deploy to Pages
 
 on:
   push:
     branches: [ main, master ]
-    tags: [ 'v*' ]
   workflow_dispatch:
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: 'pages'
+  cancel-in-progress: true
+
 jobs:
-  build-windows:
+  build-and-deploy:
     runs-on: windows-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       - name: Checkout repository
@@ -26,12 +37,19 @@ jobs:
           npm install
           npm install --no-save @rollup/rollup-win32-x64-msvc
 
-      - name: Build Web Assets & Windows EXE
+      - name: Build Web Assets & Windows Setup EXE
         run: npm run electron:build:win
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload Windows Executables Artifacts
+      - name: Copy Setup EXE to dist for GitHub Pages
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp release/WorkWiki-3-Setup-*.exe dist/WorkWiki-3-Setup.exe || true
+          cp release/WorkWiki-3-Setup-*.exe dist/ || true
+
+      - name: Upload Windows Executables to GitHub Actions
         uses: actions/upload-artifact@v4
         with:
           name: WorkWiki-3-Windows-x64
@@ -39,10 +57,14 @@ jobs:
             release/*.exe
           retention-days: 30
 
-      - name: Release to GitHub Releases (on tag)
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
+      - name: Setup GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages Artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          files: release/*.exe
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          path: './dist'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

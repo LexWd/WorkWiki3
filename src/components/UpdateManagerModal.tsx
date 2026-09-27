@@ -131,7 +131,7 @@ export const UpdateManagerModal: React.FC<UpdateManagerModalProps> = ({
       const targetFileName = `WorkWiki-3-Setup-${checkResult.latestVersion}.exe`;
       const downloadTargetUrl =
         checkResult.exeUrl ||
-        `https://github.com/lexwd/WorkWiki3/releases/download/v${checkResult.latestVersion}/${targetFileName}`;
+        updateManager.getSetupDownloadUrl();
 
       const res = await updateManager.downloadExeUpdate(downloadTargetUrl, targetFileName);
 
@@ -147,11 +147,11 @@ export const UpdateManagerModal: React.FC<UpdateManagerModalProps> = ({
       } else {
         setIsUpdatingOneClick(false);
         setDownloadError(res.error || 'Не удалось скачать файл установщика. Открываем страницу загрузки...');
-        updateManager.openExternalUrl(checkResult.downloadUrl || updateManager.getReleasesUrl());
+        updateManager.openExternalUrl(checkResult.pageUrl || updateManager.getPageUrl());
       }
     } else {
-      // In web browser: open direct exe download or GitHub Releases page
-      const url = checkResult.exeUrl || checkResult.downloadUrl || updateManager.getReleasesUrl();
+      // In web browser: open direct exe download or GitHub Pages
+      const url = checkResult.exeUrl || updateManager.getSetupDownloadUrl();
       updateManager.openExternalUrl(url);
       if (onToast) {
         onToast('Загрузка Setup', 'Начато скачивание установщика через браузер.');
@@ -159,9 +159,14 @@ export const UpdateManagerModal: React.FC<UpdateManagerModalProps> = ({
     }
   };
 
-  const handleOpenReleases = () => {
+  const handleOpenPage = () => {
     soundService.playClick(settings.soundEffects);
-    updateManager.openExternalUrl(checkResult?.downloadUrl || updateManager.getReleasesUrl());
+    updateManager.openExternalUrl(checkResult?.pageUrl || updateManager.getPageUrl());
+  };
+
+  const handleOpenActions = () => {
+    soundService.playClick(settings.soundEffects);
+    updateManager.openExternalUrl(checkResult?.actionsUrl || updateManager.getActionsUrl());
   };
 
   return (
@@ -334,12 +339,12 @@ export const UpdateManagerModal: React.FC<UpdateManagerModalProps> = ({
 
                       <button
                         type="button"
-                        onClick={handleOpenReleases}
+                        onClick={handleOpenActions}
                         className="w-full sm:w-auto flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl font-semibold text-xs text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-colors cursor-pointer shrink-0"
-                        title="Открыть страницу релизов на GitHub"
+                        title="Открыть страницу сборок в GitHub Actions"
                       >
                         <ExternalLink className="w-3.5 h-3.5 text-sky-400" />
-                        <span>GitHub Релизы</span>
+                        <span>GitHub Actions</span>
                       </button>
                     </div>
                   ) : (
@@ -358,7 +363,7 @@ export const UpdateManagerModal: React.FC<UpdateManagerModalProps> = ({
                         type="button"
                         onClick={handleOneClickDesktopUpdate}
                         className="w-full sm:w-auto flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl font-semibold text-xs text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-colors cursor-pointer shrink-0"
-                        title="Скачать установщик для Windows"
+                        title="Скачать установщик для Windows с GitHub Pages"
                       >
                         <DownloadCloud className="w-3.5 h-3.5 text-sky-400" />
                         <span>Скачать Setup (.exe)</span>
@@ -376,14 +381,22 @@ export const UpdateManagerModal: React.FC<UpdateManagerModalProps> = ({
                   {checkResult.errorMessage || 'Не удалось связаться с сервером обновлений. Проверьте соединение с интернетом.'}
                 </span>
               </div>
-              <div className="flex justify-end pt-1">
+              <div className="flex items-center justify-end gap-2 pt-1 flex-wrap">
                 <button
                   type="button"
-                  onClick={handleOpenReleases}
+                  onClick={handleOpenPage}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-sky-300 bg-slate-900 border border-slate-700 hover:border-sky-500 transition-colors cursor-pointer"
                 >
+                  <Globe className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>GitHub Pages</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleOpenActions}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-200 bg-slate-900 border border-slate-700 hover:border-sky-500 transition-colors cursor-pointer"
+                >
                   <ExternalLink className="w-3.5 h-3.5 text-sky-400" />
-                  <span>Открыть страницу релизов на GitHub</span>
+                  <span>GitHub Actions</span>
                 </button>
               </div>
             </div>
@@ -395,13 +408,23 @@ export const UpdateManagerModal: React.FC<UpdateManagerModalProps> = ({
                   {statusMessage || `У вас установлена последняя версия WorkWiki 3 (v${CURRENT_APP_VERSION}). Программа работает в оптимальном режиме.`}
                 </span>
               </div>
-              <button
-                type="button"
-                onClick={handleOpenReleases}
-                className="text-[11px] text-sky-400 hover:text-sky-300 font-semibold underline underline-offset-2 shrink-0 cursor-pointer"
-              >
-                Релизы на GitHub
-              </button>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleOpenPage}
+                  className="text-[11px] text-emerald-400 hover:text-emerald-300 font-semibold underline underline-offset-2 cursor-pointer"
+                >
+                  GitHub Pages
+                </button>
+                <span className="text-slate-600">•</span>
+                <button
+                  type="button"
+                  onClick={handleOpenActions}
+                  className="text-[11px] text-sky-400 hover:text-sky-300 font-semibold underline underline-offset-2 cursor-pointer"
+                >
+                  Actions
+                </button>
+              </div>
             </div>
           )}
 
