@@ -356,20 +356,25 @@ export function resolveTokenValue(
         return boundVal;
       }
     }
-    // Return default or first option
-    if (config.defaultValue) return config.defaultValue;
-    if (config.options && config.options.length > 0) return config.options[0];
+    // Return default or first option (even if empty string)
+    if (config.defaultValue !== undefined && config.defaultValue !== null) {
+      return String(config.defaultValue);
+    }
+    if (config.options && config.options.length > 0) {
+      return String(config.options[0] ?? '');
+    }
+    return '';
   }
 
   // 4. Check if activeRow has an exact column name matching the tokenKey
   if (activeRow?.data) {
-    if (activeRow.data[cleanKey]) {
-      return activeRow.data[cleanKey];
+    if (activeRow.data[cleanKey] !== undefined) {
+      return String(activeRow.data[cleanKey]);
     }
     for (const [colName, val] of Object.entries(activeRow.data)) {
       const normCol = colName.toLowerCase().replace(/\s+/g, '_').replace(/ё/g, 'е');
-      if (normCol === normKey) {
-        return val;
+      if (normCol === normKey && val !== undefined) {
+        return String(val);
       }
     }
   }

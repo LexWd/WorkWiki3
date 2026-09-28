@@ -291,7 +291,7 @@ ipcMain.handle('check-for-updates', async () => {
         url,
         {
           headers: {
-            'User-Agent': `WorkWiki3/${app.getVersion() || '2.3.1'}`,
+            'User-Agent': `WorkWiki3/${app.getVersion() || '2.3.2'}`,
             'Cache-Control': 'no-cache',
             Accept: 'application/json',
           },
@@ -364,7 +364,7 @@ ipcMain.handle('download-update-exe', async (_event, { url, fileName }) => {
         targetUrl,
         {
           headers: {
-            'User-Agent': `WorkWiki3/${app.getVersion() || '2.3.1'}`,
+            'User-Agent': `WorkWiki3/${app.getVersion() || '2.3.2'}`,
             Accept: '*/*',
           },
         },

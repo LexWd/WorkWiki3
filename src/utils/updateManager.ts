@@ -1,6 +1,6 @@
 import { storage } from './storage';
 
-export const CURRENT_APP_VERSION = '2.3.1';
+export const CURRENT_APP_VERSION = '2.3.2';
 export const BUILD_DATE = '2026-09-27';
 export const GITHUB_REPO_URL = 'https://github.com/lexwd/WorkWiki3';
 export const GITHUB_PAGE_URL = 'https://lexwd.github.io/WorkWiki3/';
@@ -174,7 +174,7 @@ export const updateManager = {
    * 1. Returns cached result if called repeatedly within 10 seconds (unless forced)
    * 2. Deduplicates concurrent in-flight requests to a single Promise
    * 3. Queries repository actions, GitHub Pages manifest, raw repo branch and repository tags
-   * 4. Accurately compares against CURRENT_APP_VERSION (2.3.1)
+   * 4. Accurately compares against CURRENT_APP_VERSION (2.3.2)
    */
   async checkForUpdates(force = false): Promise<UpdateCheckResult> {
     const now = Date.now();
@@ -334,7 +334,7 @@ export const updateManager = {
     fetchedResults.sort((a, b) => compareSemver(a.version, b.version));
     const highest = fetchedResults[fetchedResults.length - 1];
 
-    // Compare with CURRENT_APP_VERSION (2.3.1)
+    // Compare with CURRENT_APP_VERSION (2.3.2)
     // Only true if highest.version is strictly newer than CURRENT_APP_VERSION
     const hasUpdate = compareSemver(CURRENT_APP_VERSION, highest.version) > 0;
 
