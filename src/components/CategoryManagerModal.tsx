@@ -93,8 +93,9 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
 
+  const isLight = settings.theme === 'light-minimal';
   const theme = getThemeClasses(settings.theme);
-  const accent = getAccentClasses(settings.accentColor);
+  const accent = getAccentClasses(settings.accentColor, isLight);
 
   useEffect(() => {
     if (isOpen) {

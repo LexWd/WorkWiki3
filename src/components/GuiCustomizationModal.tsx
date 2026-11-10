@@ -124,8 +124,9 @@ export const GuiCustomizationModal: React.FC<GuiCustomizationModalProps> = ({
   const iconFileInputRef = useRef<HTMLInputElement>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isLight = settings.theme === 'light-minimal';
   const theme = getThemeClasses(settings.theme);
-  const accent = getAccentClasses(settings.accentColor);
+  const accent = getAccentClasses(settings.accentColor, isLight);
 
   useEffect(() => {
     if (isOpen) {
@@ -262,24 +263,28 @@ export const GuiCustomizationModal: React.FC<GuiCustomizationModalProps> = ({
                 <Sliders className="w-4 h-4" />
               </div>
               <div>
-                <h2 className="font-bold text-sm text-slate-100">Центр настроек системы и интерфейса</h2>
-                <p className="text-[11px] text-slate-400">
+                <h2 className={`font-bold text-sm ${isLight ? 'text-slate-900' : 'text-slate-100'}`}>Центр настроек системы и интерфейса</h2>
+                <p className={`text-[11px] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                   Внешний вид, управление иконками, коллекции шаблонов JSON и бэкапы
                 </p>
               </div>
             </div>
-            <button onClick={onClose} className="p-1 rounded text-slate-400 hover:text-slate-200">
+            <button onClick={onClose} className={`p-1 rounded ${isLight ? 'text-slate-400 hover:text-slate-700' : 'text-slate-400 hover:text-slate-200'}`}>
               <X className="w-4 h-4" />
             </button>
           </div>
 
           {/* Section Tabs Navigation */}
-          <div className="px-4 pt-3 pb-2 border-b border-slate-800 flex items-center gap-2 bg-slate-950/60 shrink-0 flex-wrap">
+          <div className={`px-4 pt-3 pb-2 border-b flex items-center gap-2 shrink-0 flex-wrap ${
+            isLight ? 'border-slate-200 bg-slate-100' : 'border-slate-800 bg-slate-950/60'
+          }`}>
             <button
               onClick={() => setActiveTab('gui')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 activeTab === 'gui'
-                  ? `${accent.primary} shadow-xs`
+                  ? `${accent.primary} shadow-xs font-bold`
+                  : isLight
+                  ? 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50'
                   : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200'
               }`}
             >
@@ -291,14 +296,18 @@ export const GuiCustomizationModal: React.FC<GuiCustomizationModalProps> = ({
               onClick={() => setActiveTab('icons')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 activeTab === 'icons'
-                  ? `${accent.primary} shadow-xs`
+                  ? `${accent.primary} shadow-xs font-bold`
+                  : isLight
+                  ? 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50'
                   : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200'
               }`}
             >
-              <ImageIcon className="w-3.5 h-3.5 text-purple-400" />
+              <ImageIcon className={`w-3.5 h-3.5 ${isLight ? 'text-purple-600' : 'text-purple-400'}`} />
               <span>Иконки</span>
               {customIcons.length > 0 && (
-                <span className="font-mono text-[10px] bg-purple-500/20 text-purple-300 px-1.5 py-0.2 rounded-full border border-purple-500/30">
+                <span className={`font-mono text-[10px] px-1.5 py-0.2 rounded-full border ${
+                  isLight ? 'bg-purple-50 text-purple-800 border-purple-200 font-bold' : 'bg-purple-500/20 text-purple-300 border-purple-500/30'
+                }`}>
                   +{customIcons.length}
                 </span>
               )}
@@ -308,11 +317,13 @@ export const GuiCustomizationModal: React.FC<GuiCustomizationModalProps> = ({
               onClick={() => setActiveTab('collections')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 activeTab === 'collections'
-                  ? `${accent.primary} shadow-xs`
+                  ? `${accent.primary} shadow-xs font-bold`
+                  : isLight
+                  ? 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50'
                   : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200'
               }`}
             >
-              <FileJson className="w-3.5 h-3.5 text-sky-400" />
+              <FileJson className={`w-3.5 h-3.5 ${isLight ? 'text-sky-600' : 'text-sky-400'}`} />
               <span>Коллекции шаблонов</span>
               <span className="text-[10px] opacity-75 font-mono">({availableCategories.length})</span>
             </button>
@@ -321,7 +332,9 @@ export const GuiCustomizationModal: React.FC<GuiCustomizationModalProps> = ({
               onClick={() => setActiveTab('backup')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 activeTab === 'backup'
-                  ? `${accent.primary} shadow-xs`
+                  ? `${accent.primary} shadow-xs font-bold`
+                  : isLight
+                  ? 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50'
                   : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200'
               }`}
             >
@@ -897,7 +910,7 @@ export const GuiCustomizationModal: React.FC<GuiCustomizationModalProps> = ({
                     Полная резервная копия системы
                   </p>
                   <p className="text-slate-400">
-                    Включает все сущности рабочего пространства: все шаблоны быстрых ответов, базы данных строк Excel,
+                    Включает все сущности рабочего пространства: все шаблоны быстрых ответов,
                     плейсхолдеры, полезные ссылки и виджеты, карточки-заметки, метрики и персональные настройки интерфейса.
                   </p>
                 </div>

@@ -7,7 +7,6 @@ import { CURRENT_APP_VERSION } from '../utils/updateManager';
 interface ProductivityStatsBarProps {
   settings: GuiSettings;
   snippetCount: number;
-  tableRowsCount?: number;
   placeholderCount: number;
   historyCount?: number;
   onOpenHistory?: () => void;

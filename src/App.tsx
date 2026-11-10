@@ -3,8 +3,6 @@ import { Zap, FileText } from 'lucide-react';
 import { 
   Snippet, 
   PlaceholderConfig, 
-  ExcelTable, 
-  ExcelRow, 
   GuiSettings, 
   ProductivityMetrics, 
   ActiveTab,
@@ -41,7 +39,6 @@ export default function App() {
   // Core persistent states
   const [snippets, setSnippets] = useState<Snippet[]>(() => storage.loadSnippets());
   const [placeholders, setPlaceholders] = useState<PlaceholderConfig[]>(() => storage.loadPlaceholders());
-  const [tables, setTables] = useState<ExcelTable[]>(() => storage.loadExcelTables());
   const [widgets, setWidgets] = useState<ResourceWidget[]>(() => storage.loadResourceWidgets());
   const [notes, setNotes] = useState<NoteCard[]>(() => storage.loadNotes());
   const [settings, setSettings] = useState<GuiSettings>(() => storage.loadSettings());
@@ -57,14 +54,6 @@ export default function App() {
 
   // Active selections
   const [activeTab, setActiveTab] = useState<ActiveTab>('snippets');
-  const [activeTableId, setActiveTableId] = useState<string>(() => {
-    const list = storage.loadExcelTables();
-    return list[0]?.id || '';
-  });
-  const [activeRow, setActiveRow] = useState<ExcelRow | null>(() => {
-    const list = storage.loadExcelTables();
-    return list[0]?.rows[0] || null;
-  });
   const [selectedSnippet, setSelectedSnippet] = useState<Snippet | null>(() => {
     const snips = storage.loadSnippets();
     return snips[0] || null;
@@ -95,8 +84,9 @@ export default function App() {
   const [newSnippetInitialCategory, setNewSnippetInitialCategory] = useState<string | undefined>(undefined);
 
   // Theme & font helpers
+  const isLight = settings.theme === 'light-minimal';
   const theme = getThemeClasses(settings.theme);
-  const accent = getAccentClasses(settings.accentColor);
+  const accent = getAccentClasses(settings.accentColor, isLight);
   const fontScale = getFontScaleStyle(settings.fontSize);
 
   // Toast notification helper with guaranteed uniqueness
@@ -146,9 +136,6 @@ export default function App() {
     storage.savePlaceholders(placeholders);
   }, [placeholders]);
 
-  useEffect(() => {
-    storage.saveExcelTables(tables);
-  }, [tables]);
 
   useEffect(() => {
     storage.saveResourceWidgets(widgets);
@@ -228,7 +215,7 @@ export default function App() {
   // Copy snippet or resolved text
   const handleCopySnippet = useCallback(
     async (snippet: Snippet) => {
-      const { result } = interpolateSnippet(snippet.content, placeholders, activeRow, settings.agentName);
+      const { result } = interpolateSnippet(snippet.content, placeholders, null, settings.agentName);
       await copyToClipboard(result);
 
       soundService.playCopyChime(settings.soundEffects);
@@ -252,7 +239,7 @@ export default function App() {
         timeSavedSeconds: prev.timeSavedSeconds + Math.round((words / 35) * 60) + 15,
       }));
     },
-    [placeholders, activeRow, settings.agentName, settings.soundEffects, showToast]
+    [placeholders, settings.agentName, settings.soundEffects, showToast]
   );
 
   const handleCopyResolvedText = useCallback(
@@ -274,35 +261,6 @@ export default function App() {
     },
     [settings.soundEffects, showToast]
   );
-
-  // Table operations
-  const handleUpdateTable = useCallback((updated: ExcelTable) => {
-    setTables((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
-  }, []);
-
-  const handleCreateTable = useCallback((created: ExcelTable) => {
-    setTables((prev) => [created, ...prev]);
-    setActiveTableId(created.id);
-  }, []);
-
-  const handleDeleteTable = useCallback((id: string) => {
-    const tableToDelete = tables.find((t) => t.id === id);
-    const tableName = tableToDelete ? tableToDelete.name : 'Таблица';
-
-    setTables((prev) => {
-      const rest = prev.filter((t) => t.id !== id);
-      if (rest.length > 0) {
-        setActiveTableId(rest[0].id);
-        setActiveRow(rest[0].rows[0] || null);
-      } else {
-        setActiveTableId('');
-        setActiveRow(null);
-      }
-      return rest;
-    });
-
-    showToast('Таблица удалена', `Таблица «${tableName}» удалена из базы данных`);
-  }, [tables, showToast]);
 
   // Widget operations
   const handleAddWidget = useCallback((widget: ResourceWidget) => {
@@ -655,12 +613,6 @@ export default function App() {
         return;
       }
 
-      // Ctrl+D -> Switch Tab to Excel or Snippets (en: d, ru: в)
-      if ((e.ctrlKey || e.metaKey) && isKey(e, 'KeyD', 'd', 'в')) {
-        e.preventDefault();
-        setActiveTab((prev) => (prev === 'excel' ? 'snippets' : 'excel'));
-        return;
-      }
 
       const digit = getDigit(e);
 
@@ -720,13 +672,12 @@ export default function App() {
     if (success) {
       setSnippets(storage.loadSnippets());
       setPlaceholders(storage.loadPlaceholders());
-      setTables(storage.loadExcelTables());
       setWidgets(storage.loadResourceWidgets());
       setResourceCategories(storage.loadResourceCategories());
       setNotes(storage.loadNotes());
       setCategoryMetadata(storage.loadCategoryMetadata());
       setSettings(storage.loadSettings());
-      showToast('Резервная копия загружена', 'Все шаблоны, таблицы, заметки и настройки успешно обновлены.');
+      showToast('Резервная копия загружена', 'Все шаблоны, заметки и настройки успешно обновлены.');
     } else {
       showToast('Ошибка импорта', 'Ошибка при чтении файла резервной копии. Проверьте формат JSON.');
     }
@@ -736,15 +687,13 @@ export default function App() {
     storage.resetAllData();
     setSnippets(storage.loadSnippets());
     setPlaceholders(storage.loadPlaceholders());
-    setTables(storage.loadExcelTables());
     setWidgets(storage.loadResourceWidgets());
     setResourceCategories(storage.resetResourceCategories());
     setNotes(storage.loadNotes());
     setCategoryMetadata(storage.loadCategoryMetadata());
     setSettings(storage.loadSettings());
     setMetrics(storage.loadMetrics());
-    setActiveRow(storage.loadExcelTables()[0]?.rows[0] || null);
-    showToast('Сброс завершен', 'Восстановлены стандартные шаблоны, Excel-база и заметки.');
+    showToast('Сброс завершен', 'Восстановлены стандартные шаблоны и заметки.');
   };
 
   const handleDataRestored = () => {
@@ -754,21 +703,13 @@ export default function App() {
     setCustomIcons(storage.loadCustomIcons());
     setHiddenIconIds(storage.loadHiddenIcons());
     setPlaceholders(storage.loadPlaceholders());
-    setTables(storage.loadExcelTables());
     setWidgets(storage.loadResourceWidgets());
     setResourceCategories(storage.loadResourceCategories());
     setNotes(storage.loadNotes());
     setSettings(storage.loadSettings());
     setMetrics(storage.loadMetrics());
-    const reloadedTables = storage.loadExcelTables();
-    setActiveRow(reloadedTables[0]?.rows[0] || null);
     showToast('Резервная копия', 'База данных и настройки успешно обновлены!');
   };
-
-  // Total rows count across all tables
-  const totalRowsCount = useMemo(() => {
-    return tables.reduce((acc, t) => acc + t.rows.length, 0);
-  }, [tables]);
 
   return (
     <div 
@@ -803,7 +744,6 @@ export default function App() {
           }))
         }
         snippetCount={snippets.length}
-        tableCount={tables.length}
         placeholderCount={placeholders.length}
         resourceCount={widgets.length}
         noteCount={notes.length}
@@ -817,7 +757,6 @@ export default function App() {
             <MiniHudBar
               snippets={snippets}
               placeholders={placeholders}
-              activeRow={activeRow}
               onCopySnippet={handleCopySnippet}
               onToggleMiniMode={() => setSettings((prev) => ({ ...prev, windowMode: 'full' }))}
               settings={settings}
@@ -871,7 +810,6 @@ export default function App() {
                 <SnippetListPanel
                   snippets={snippets}
                   placeholders={placeholders}
-                  activeRow={activeRow}
                   settings={settings}
                   onCopySnippet={handleCopySnippet}
                   onEditSnippet={(s) => setEditingSnippet(s)}
@@ -910,28 +848,33 @@ export default function App() {
                   setIsResizingSidebar(true);
                 }}
                 onDoubleClick={() => {
-                  setSidebarWidth(400);
-                  setSettings((prev) => ({ ...prev, sidebarWidth: 400 }));
+                  setSidebarWidth(520);
+                  setSettings((prev) => ({ ...prev, sidebarWidth: 520 }));
                 }}
-                title="Потяните для изменения ширины каталога (двойной клик — сброс к 400px)"
+                title="Потяните для изменения пропорций каталога и редактора (двойной клик — сброс к 520px)"
                 className={`hidden md:flex w-1.5 hover:w-2 select-none cursor-col-resize items-center justify-center shrink-0 transition-all group ${
-                  isResizingSidebar ? 'bg-sky-500 w-2' : 'bg-slate-800/80 hover:bg-sky-500/60'
+                  isResizingSidebar
+                    ? 'bg-sky-500 w-2 shadow-xs'
+                    : isLight
+                    ? 'bg-slate-200 hover:bg-sky-400/60 border-l border-r border-slate-300/40'
+                    : 'bg-slate-800/80 hover:bg-sky-500/60'
                 }`}
               >
-                <div className="w-0.5 h-8 rounded-full bg-slate-600 group-hover:bg-white transition-colors" />
+                <div className={`w-0.5 h-8 rounded-full transition-colors ${
+                  isLight ? 'bg-slate-400 group-hover:bg-slate-800' : 'bg-slate-600 group-hover:bg-white'
+                }`} />
               </div>
 
               {/* Right Column: Live Composer and Dynamic Resolver */}
               <div
-                className={`flex-1 h-full min-w-0 overflow-hidden ${
-                  snippetMobileView === 'composer' ? 'flex' : 'hidden md:flex'
+                className={`flex-1 h-full w-full min-w-0 overflow-hidden ${theme.panel} ${
+                  snippetMobileView === 'composer' ? 'flex flex-col' : 'hidden md:flex md:flex-col'
                 }`}
               >
                 <LiveComposerAndResolver
                   selectedSnippet={selectedSnippet}
                   snippets={snippets}
                   placeholders={placeholders}
-                  activeRow={activeRow}
                   settings={settings}
                   onCopyResolved={(text, title) => handleCopyResolvedText(text, title)}
                   onSelectSnippet={(s) => setSelectedSnippet(s)}
@@ -947,7 +890,6 @@ export default function App() {
               <PlaceholderManagerPanel
                 placeholders={placeholders}
                 onUpdatePlaceholders={setPlaceholders}
-                tables={tables}
                 settings={settings}
               />
             </div>
@@ -996,7 +938,6 @@ export default function App() {
       <ProductivityStatsBar
         settings={settings}
         snippetCount={snippets.length}
-        tableRowsCount={totalRowsCount}
         placeholderCount={placeholders.length}
       />
 
@@ -1004,14 +945,31 @@ export default function App() {
       <ToastNotice toasts={toasts} settings={settings} />
 
       {/* Modals & Overlays */}
-      {/* 1. Quick Command Palette (Ctrl+K or /) */}
+      {/* 1. Quick Command Palette & Global Smart Search (Ctrl+K or /) */}
       <QuickCommandPalette
         isOpen={isPaletteOpen}
         onClose={() => setIsPaletteOpen(false)}
         snippets={snippets}
         placeholders={placeholders}
-        activeRow={activeRow}
+        notes={notes}
+        widgets={widgets}
         onSelectAndCopy={handleCopySnippet}
+        onSelectPlaceholder={(p) => {
+          setActiveTab('placeholders');
+          showToast('Плейсхолдер', `Переход к «${p.label}»`);
+        }}
+        onSelectNote={(n) => {
+          setActiveTab('notes');
+          showToast('Заметка', `Открыта заметка «${n.title}»`);
+        }}
+        onSelectResource={(r) => {
+          if (r.url) {
+            window.open(r.url, '_blank');
+          } else {
+            setActiveTab('resources');
+          }
+          showToast('Ресурс', `Открыт «${r.title}»`);
+        }}
         settings={settings}
       />
 
@@ -1025,7 +983,6 @@ export default function App() {
         }}
         onSave={handleSaveSnippet}
         placeholders={placeholders}
-        activeRow={activeRow}
         settings={settings}
         availableCategories={categories}
         categoryMetadata={categoryMetadata}
@@ -1087,7 +1044,6 @@ export default function App() {
         snippets={snippets}
         categories={categories}
         placeholders={placeholders}
-        tables={tables}
         widgets={widgets}
         resourceCategories={resourceCategories}
         notes={notes}

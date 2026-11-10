@@ -153,6 +153,121 @@ export const CATEGORY_COLOR_DEFS: Record<CategoryColor, CategoryColorDef> = {
   },
 };
 
+export const LIGHT_CATEGORY_COLOR_DEFS: Record<CategoryColor, CategoryColorDef> = {
+  sky: {
+    id: 'sky',
+    label: 'Небесный',
+    pillBg: 'bg-sky-50',
+    pillBorder: 'border-sky-200',
+    pillText: 'text-sky-800',
+    dotColor: 'bg-sky-600',
+    activeBg: 'bg-sky-100',
+    activeBorder: 'border-sky-500',
+    activeText: 'text-sky-900',
+    ringColor: 'ring-sky-500/30',
+    hoverBorder: 'hover:border-sky-300',
+    subtleBadge: 'bg-sky-50 text-sky-800 border-sky-200',
+  },
+  emerald: {
+    id: 'emerald',
+    label: 'Изумрудный',
+    pillBg: 'bg-emerald-50',
+    pillBorder: 'border-emerald-200',
+    pillText: 'text-emerald-800',
+    dotColor: 'bg-emerald-600',
+    activeBg: 'bg-emerald-100',
+    activeBorder: 'border-emerald-500',
+    activeText: 'text-emerald-900',
+    ringColor: 'ring-emerald-500/30',
+    hoverBorder: 'hover:border-emerald-300',
+    subtleBadge: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+  },
+  amber: {
+    id: 'amber',
+    label: 'Янтарный',
+    pillBg: 'bg-amber-50',
+    pillBorder: 'border-amber-200',
+    pillText: 'text-amber-900',
+    dotColor: 'bg-amber-600',
+    activeBg: 'bg-amber-100',
+    activeBorder: 'border-amber-500',
+    activeText: 'text-amber-950',
+    ringColor: 'ring-amber-500/30',
+    hoverBorder: 'hover:border-amber-300',
+    subtleBadge: 'bg-amber-50 text-amber-900 border-amber-200',
+  },
+  purple: {
+    id: 'purple',
+    label: 'Фиолетовый',
+    pillBg: 'bg-purple-50',
+    pillBorder: 'border-purple-200',
+    pillText: 'text-purple-800',
+    dotColor: 'bg-purple-600',
+    activeBg: 'bg-purple-100',
+    activeBorder: 'border-purple-500',
+    activeText: 'text-purple-950',
+    ringColor: 'ring-purple-500/30',
+    hoverBorder: 'hover:border-purple-300',
+    subtleBadge: 'bg-purple-50 text-purple-800 border-purple-200',
+  },
+  rose: {
+    id: 'rose',
+    label: 'Коралловый',
+    pillBg: 'bg-rose-50',
+    pillBorder: 'border-rose-200',
+    pillText: 'text-rose-800',
+    dotColor: 'bg-rose-600',
+    activeBg: 'bg-rose-100',
+    activeBorder: 'border-rose-500',
+    activeText: 'text-rose-950',
+    ringColor: 'ring-rose-500/30',
+    hoverBorder: 'hover:border-rose-300',
+    subtleBadge: 'bg-rose-50 text-rose-800 border-rose-200',
+  },
+  indigo: {
+    id: 'indigo',
+    label: 'Индиго',
+    pillBg: 'bg-indigo-50',
+    pillBorder: 'border-indigo-200',
+    pillText: 'text-indigo-800',
+    dotColor: 'bg-indigo-600',
+    activeBg: 'bg-indigo-100',
+    activeBorder: 'border-indigo-500',
+    activeText: 'text-indigo-950',
+    ringColor: 'ring-indigo-500/30',
+    hoverBorder: 'hover:border-indigo-300',
+    subtleBadge: 'bg-indigo-50 text-indigo-800 border-indigo-200',
+  },
+  cyan: {
+    id: 'cyan',
+    label: 'Бирюзовый',
+    pillBg: 'bg-cyan-50',
+    pillBorder: 'border-cyan-200',
+    pillText: 'text-cyan-800',
+    dotColor: 'bg-cyan-600',
+    activeBg: 'bg-cyan-100',
+    activeBorder: 'border-cyan-500',
+    activeText: 'text-cyan-950',
+    ringColor: 'ring-cyan-500/30',
+    hoverBorder: 'hover:border-cyan-300',
+    subtleBadge: 'bg-cyan-50 text-cyan-800 border-cyan-200',
+  },
+  slate: {
+    id: 'slate',
+    label: 'Графитовый',
+    pillBg: 'bg-slate-100',
+    pillBorder: 'border-slate-300',
+    pillText: 'text-slate-800',
+    dotColor: 'bg-slate-600',
+    activeBg: 'bg-slate-200',
+    activeBorder: 'border-slate-500',
+    activeText: 'text-slate-900',
+    ringColor: 'ring-slate-500/30',
+    hoverBorder: 'hover:border-slate-400',
+    subtleBadge: 'bg-slate-100 text-slate-800 border-slate-300',
+  },
+};
+
 export const AVAILABLE_CATEGORY_ICONS: { id: string; label: string; icon: React.FC<{ className?: string }> }[] = [
   { id: 'Folder', label: 'Папка', icon: Folder },
   { id: 'MessageSquare', label: 'Диалог / Приветствие', icon: MessageSquare },
@@ -262,8 +377,11 @@ export function renderCategoryIcon(
  */
 export function getCategoryMeta(
   categoryName: string,
-  customMap?: Record<string, CategoryMetadata>
+  customMap?: Record<string, CategoryMetadata>,
+  isLight: boolean = false
 ): { color: CategoryColor; icon: string; style: CategoryColorDef } {
+  const table = isLight ? LIGHT_CATEGORY_COLOR_DEFS : CATEGORY_COLOR_DEFS;
+
   // 1. Check custom overrides from map
   if (customMap && customMap[categoryName]) {
     const custom = customMap[categoryName];
@@ -272,7 +390,7 @@ export function getCategoryMeta(
     return {
       color: colorKey,
       icon: iconKey,
-      style: CATEGORY_COLOR_DEFS[colorKey] || CATEGORY_COLOR_DEFS.slate,
+      style: table[colorKey] || table.slate,
     };
   }
 
@@ -283,7 +401,7 @@ export function getCategoryMeta(
   return {
     color: colorKey,
     icon: iconKey,
-    style: CATEGORY_COLOR_DEFS[colorKey] || CATEGORY_COLOR_DEFS.slate,
+    style: table[colorKey] || table.slate,
   };
 }
 

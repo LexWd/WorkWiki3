@@ -53,29 +53,6 @@ export interface PlaceholderConfig {
   type: PlaceholderType; // 'text' or 'choice' (multiple choice)
   options?: string[]; // for multiple choice
   defaultValue: string;
-  excelColumnBinding?: string; // linked to Excel column name
-}
-
-export interface ExcelColumn {
-  id: string;
-  name: string;
-  key: string;
-}
-
-export interface ExcelRow {
-  id: string;
-  tags: string[]; // теги для быстрого поиска и фильтрации
-  data: Record<string, string>;
-  notes?: string;
-}
-
-export interface ExcelTable {
-  id: string;
-  name: string;
-  description: string;
-  columns: ExcelColumn[];
-  rows: ExcelRow[];
-  updatedAt: number;
 }
 
 export type AppTheme = 'dark-slate' | 'obsidian' | 'light-minimal' | 'cyber-espresso';
@@ -163,6 +140,7 @@ export interface GuiSettings {
   sidebarWidth?: number; // Resizable snippet panel width in px
   composerHeight?: number; // Resizable template composer input height in px
   autoCheckUpdates?: boolean;
+  autoBackupBeforeUpdate?: boolean; // Automatic safety backup before updating
   resourceColumns?: number; // 1, 2, 3, 4
   resourceSort?: 'custom' | 'name' | 'date' | 'pinned';
   notesColumns?: number; // 1, 2, 3, 4
@@ -204,7 +182,7 @@ export interface FullBackupPayload {
   snippets: Snippet[];
   categories: string[];
   placeholders: PlaceholderConfig[];
-  tables: ExcelTable[];
+  tables?: any[]; // legacy compatibility
   widgets: ResourceWidget[];
   resourceCategories: string[];
   notes: NoteCard[];
@@ -223,19 +201,19 @@ export interface AutoBackupPoint {
   reason: string;
   counts: {
     snippets: number;
-    tables: number;
     placeholders: number;
     notes: number;
     widgets: number;
+    tables?: number;
   };
   data: {
     snippets: Snippet[];
     placeholders: PlaceholderConfig[];
-    tables: ExcelTable[];
     widgets: ResourceWidget[];
     notes: NoteCard[];
     categories: string[];
     settings?: GuiSettings;
+    tables?: any[];
   };
 }
 
@@ -259,6 +237,7 @@ export interface ElectronAPI {
     exeUrl?: string;
   } | null>;
   applyUpdateAndReload?: () => Promise<void>;
+  saveBackupToFile?: (opts: { payload: any; fileName?: string }) => Promise<{ success: boolean; filePath?: string; error?: string }>;
   copyToClipboard?: (text: string) => Promise<boolean>;
   openExternalUrl?: (url: string) => Promise<boolean>;
   downloadUpdateExe?: (opts: { url: string; fileName?: string }) => Promise<{ success: boolean; filePath?: string; fileName?: string; error?: string }>;

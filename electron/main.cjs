@@ -523,3 +523,33 @@ ipcMain.handle('apply-update-and-reload', () => {
   }
 });
 
+// Save complete safety backup to local disk before update
+ipcMain.handle('save-backup-to-file', async (_event, { payload, fileName }) => {
+  try {
+    const userData = app.getPath('userData');
+    const backupsDir = path.join(userData, 'backups');
+    if (!fs.existsSync(backupsDir)) {
+      fs.mkdirSync(backupsDir, { recursive: true });
+    }
+    const safeName = fileName || `workwiki-3-backup-${Date.now()}.json`;
+    const targetPath = path.join(backupsDir, safeName);
+    fs.writeFileSync(targetPath, JSON.stringify(payload, null, 2), 'utf8');
+
+    // Also copy to Documents/WorkWiki-Backups so user can easily access it
+    try {
+      const docsDir = path.join(app.getPath('documents'), 'WorkWiki-Backups');
+      if (!fs.existsSync(docsDir)) {
+        fs.mkdirSync(docsDir, { recursive: true });
+      }
+      fs.writeFileSync(path.join(docsDir, safeName), JSON.stringify(payload, null, 2), 'utf8');
+    } catch (e) {
+      // Silently ignore if Documents is restricted
+    }
+
+    return { success: true, filePath: targetPath };
+  } catch (err) {
+    console.error('Failed to save backup to file:', err);
+    return { success: false, error: err.message };
+  }
+});
+

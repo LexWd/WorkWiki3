@@ -99,8 +99,15 @@ export const UpdateManagerModal: React.FC<UpdateManagerModalProps> = ({
     setIsUpdating(true);
     soundService.playSuccess(settings.soundEffects);
 
-    setUpdatePhase('Создание резервной точки восстановления...');
-    await new Promise((r) => setTimeout(r, 450));
+    if (settings.autoBackupBeforeUpdate !== false) {
+      setUpdatePhase('Создание автоматической резервной копии базы...');
+      try {
+        await storage.createPreUpdateBackup(checkResult?.latestVersion || CURRENT_APP_VERSION, false);
+      } catch (e) {
+        console.warn('Backup error:', e);
+      }
+      await new Promise((r) => setTimeout(r, 400));
+    }
 
     setUpdatePhase('Очистка кэша и синхронизация сервисов...');
     await new Promise((r) => setTimeout(r, 450));
@@ -121,12 +128,22 @@ export const UpdateManagerModal: React.FC<UpdateManagerModalProps> = ({
     if (isElectron && window.electronAPI?.downloadUpdateExe) {
       setIsUpdatingOneClick(true);
       setDownloadProgress(0);
-      setDownloadProgressText('Подготовка к загрузке установщика...');
 
-      // Save a local safety backup before updating
-      try {
-        storage.createAutoBackup(`Резервная копия перед обновлением до v${checkResult.latestVersion}`);
-      } catch {}
+      // 1. Automatic safety backup before updating
+      if (settings.autoBackupBeforeUpdate !== false) {
+        setDownloadProgressText('Создание автоматической резервной копии базы данных...');
+        try {
+          const backupRes = await storage.createPreUpdateBackup(checkResult.latestVersion, false);
+          const snippetsCount = backupRes.point?.counts?.snippets || 0;
+          const tablesCount = backupRes.point?.counts?.tables || 0;
+          setDownloadProgressText(`Резервная копия сохранена (${snippetsCount} шаблонов, ${tablesCount} табл.). Загрузка...`);
+          await new Promise((r) => setTimeout(r, 450));
+        } catch (backupErr) {
+          console.warn('Backup before update warning:', backupErr);
+        }
+      }
+
+      setDownloadProgressText('Подготовка к загрузке установщика...');
 
       const targetFileName = `WorkWiki-3-Setup-${checkResult.latestVersion}.exe`;
       const downloadTargetUrl =
@@ -150,11 +167,17 @@ export const UpdateManagerModal: React.FC<UpdateManagerModalProps> = ({
         updateManager.openExternalUrl(checkResult.pageUrl || updateManager.getPageUrl());
       }
     } else {
-      // In web browser: open direct exe download or GitHub Pages
+      // In web browser: save safety backup point first
+      if (settings.autoBackupBeforeUpdate !== false) {
+        try {
+          await storage.createPreUpdateBackup(checkResult.latestVersion, false);
+        } catch {}
+      }
+
       const url = checkResult.exeUrl || updateManager.getSetupDownloadUrl();
       updateManager.openExternalUrl(url);
       if (onToast) {
-        onToast('Загрузка Setup', 'Начато скачивание установщика через браузер.');
+        onToast('Загрузка Setup', 'Создана резервная копия и начато скачивание установщика.');
       }
     }
   };
@@ -430,46 +453,91 @@ export const UpdateManagerModal: React.FC<UpdateManagerModalProps> = ({
 
           {/* Safe update guarantee notice */}
           <div className="p-3.5 rounded-xl bg-slate-900/50 border border-slate-800/80 space-y-2 text-slate-400 text-[11.5px]">
-            <div className="flex items-center gap-2 text-slate-200 font-semibold">
-              <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span>Безопасное обновление без потери данных</span>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-slate-200 font-semibold">
+                <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>Безопасное обновление без потери данных</span>
+              </div>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-950/60 text-emerald-300 border border-emerald-800/60 font-medium">
+                Авто-бэкап активен
+              </span>
             </div>
             <p>
-              Ваши шаблоны, заметки, ссылки, категории, пользовательские иконки и персональные настройки хранятся в защищенном локальном хранилище. Перед каждым обновлением автоматически создается точка восстановления.
+              Ваши шаблоны, заметки, ссылки и персональные настройки надежно защищены. Перед каждым обновлением приложение автоматически сохраняет снимок рабочего пространства на диск и в список точек восстановления.
             </p>
-            {onOpenBackupModal && (
+            <div className="flex items-center gap-3 pt-0.5 flex-wrap">
+              {onOpenBackupModal && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenBackupModal();
+                  }}
+                  className="inline-flex items-center gap-1 text-sky-400 hover:text-sky-300 font-medium underline underline-offset-2 cursor-pointer text-xs"
+                >
+                  <HardDrive className="w-3.5 h-3.5" />
+                  <span>Открыть историю резервных копий</span>
+                </button>
+              )}
               <button
                 type="button"
-                onClick={() => {
-                  onClose();
-                  onOpenBackupModal();
+                onClick={async () => {
+                  soundService.playSuccess(settings.soundEffects);
+                  const res = await storage.createPreUpdateBackup(CURRENT_APP_VERSION, !isElectron);
+                  if (onToast) {
+                    onToast(
+                      'Резервная копия создана',
+                      `Сохранено: ${res.point?.counts?.snippets || 0} шаблонов, ${res.point?.counts?.tables || 0} таблиц, ${res.point?.counts?.notes || 0} заметок.`
+                    );
+                  }
                 }}
-                className="inline-flex items-center gap-1 text-sky-400 hover:text-sky-300 font-medium underline underline-offset-2 cursor-pointer pt-0.5"
+                className="inline-flex items-center gap-1 text-emerald-400 hover:text-emerald-300 font-medium underline underline-offset-2 cursor-pointer text-xs ml-auto"
               >
-                <HardDrive className="w-3.5 h-3.5" />
-                <span>Открыть управление резервными копиями (Бэкап)</span>
+                <DownloadCloud className="w-3.5 h-3.5" />
+                <span>Создать снимок прямо сейчас</span>
               </button>
-            )}
+            </div>
           </div>
 
-          {/* Automatic checking preference */}
+          {/* Preferences */}
           {onUpdateSettings && (
-            <label className="flex items-center gap-2.5 p-3 rounded-xl bg-slate-900/40 border border-slate-800/60 cursor-pointer hover:bg-slate-900/60 transition-colors">
-              <input
-                type="checkbox"
-                checked={settings.autoCheckUpdates !== false}
-                onChange={(e) => onUpdateSettings({ autoCheckUpdates: e.target.checked })}
-                className="rounded border-slate-700 text-sky-500 focus:ring-sky-400/40"
-              />
-              <div className="flex-1">
-                <span className="font-semibold text-slate-200 block text-xs">
-                  Автоматически проверять обновления при запуске
-                </span>
-                <span className="text-[11px] text-slate-400 block">
-                  Уведомлять в шапке при появлении новых версий
-                </span>
-              </div>
-            </label>
+            <div className="space-y-2">
+              {/* Automatic Backup Preference */}
+              <label className="flex items-center gap-2.5 p-3 rounded-xl bg-slate-900/40 border border-slate-800/60 cursor-pointer hover:bg-slate-900/60 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={settings.autoBackupBeforeUpdate !== false}
+                  onChange={(e) => onUpdateSettings({ autoBackupBeforeUpdate: e.target.checked })}
+                  className="rounded border-slate-700 text-emerald-500 focus:ring-emerald-400/40"
+                />
+                <div className="flex-1">
+                  <span className="font-semibold text-slate-200 block text-xs">
+                    Создавать автоматическую резервную копию перед обновлением
+                  </span>
+                  <span className="text-[11px] text-slate-400 block">
+                    Гарантирует сохранность всей базы при переходе на новые версии
+                  </span>
+                </div>
+              </label>
+
+              {/* Automatic checking preference */}
+              <label className="flex items-center gap-2.5 p-3 rounded-xl bg-slate-900/40 border border-slate-800/60 cursor-pointer hover:bg-slate-900/60 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={settings.autoCheckUpdates !== false}
+                  onChange={(e) => onUpdateSettings({ autoCheckUpdates: e.target.checked })}
+                  className="rounded border-slate-700 text-sky-500 focus:ring-sky-400/40"
+                />
+                <div className="flex-1">
+                  <span className="font-semibold text-slate-200 block text-xs">
+                    Автоматически проверять обновления при запуске
+                  </span>
+                  <span className="text-[11px] text-slate-400 block">
+                    Уведомлять в шапке при появлении новых версий
+                  </span>
+                </div>
+              </label>
+            </div>
           )}
         </div>
 

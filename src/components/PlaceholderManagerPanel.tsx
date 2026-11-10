@@ -14,7 +14,7 @@ import {
   AlertCircle,
   ChevronDown
 } from 'lucide-react';
-import { PlaceholderConfig, PlaceholderType, ExcelTable, GuiSettings } from '../types';
+import { PlaceholderConfig, PlaceholderType, GuiSettings } from '../types';
 import { getThemeClasses, getAccentClasses } from '../utils/theme';
 import { soundService } from '../utils/sound';
 import { DEFAULT_PLACEHOLDERS } from '../data/defaultData';
@@ -24,14 +24,13 @@ import { ConditionalPlaceholderBuilderModal } from './ConditionalPlaceholderBuil
 interface PlaceholderManagerPanelProps {
   placeholders: PlaceholderConfig[];
   onUpdatePlaceholders: (placeholders: PlaceholderConfig[]) => void;
-  tables: ExcelTable[];
+  tables?: any[];
   settings: GuiSettings;
 }
 
 export const PlaceholderManagerPanel: React.FC<PlaceholderManagerPanelProps> = ({
   placeholders,
   onUpdatePlaceholders,
-  tables,
   settings,
 }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -48,16 +47,10 @@ export const PlaceholderManagerPanel: React.FC<PlaceholderManagerPanelProps> = (
   const [formOptions, setFormOptions] = useState<string[]>([]);
   const [newOptionInput, setNewOptionInput] = useState('');
   const [formDefaultVal, setFormDefaultVal] = useState('');
-  const [formBinding, setFormBinding] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
 
   const theme = getThemeClasses(settings.theme);
   const accent = getAccentClasses(settings.accentColor);
-
-  // Collect all available Excel columns from all tables
-  const availableColumns = Array.from(
-    new Set(tables.flatMap((t) => t.columns.map((c) => c.name)))
-  );
 
   const startEdit = (p: PlaceholderConfig) => {
     setEditingId(p.id);
@@ -68,7 +61,6 @@ export const PlaceholderManagerPanel: React.FC<PlaceholderManagerPanelProps> = (
     setFormType(p.type);
     setFormOptions(p.options ? [...p.options] : []);
     setFormDefaultVal(p.defaultValue);
-    setFormBinding(p.excelColumnBinding || '');
     setFormError(null);
   };
 
@@ -81,7 +73,6 @@ export const PlaceholderManagerPanel: React.FC<PlaceholderManagerPanelProps> = (
     setFormType('choice');
     setFormOptions(['Вариант 1', 'Вариант 2']);
     setFormDefaultVal('');
-    setFormBinding('');
     setFormError(null);
   };
 
@@ -124,7 +115,6 @@ export const PlaceholderManagerPanel: React.FC<PlaceholderManagerPanelProps> = (
       type: formType,
       options: formType === 'choice' ? formOptions : undefined,
       defaultValue: formDefaultVal.trim(),
-      excelColumnBinding: formBinding || undefined,
     };
 
     if (isCreatingNew) {

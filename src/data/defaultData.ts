@@ -1,4 +1,4 @@
-import { Snippet, PlaceholderConfig, ExcelTable, GuiSettings, ProductivityMetrics, ResourceWidget, NoteCard } from '../types';
+import { Snippet, PlaceholderConfig, GuiSettings, ProductivityMetrics, ResourceWidget, NoteCard } from '../types';
 
 export const DEFAULT_CATEGORY_LIST: string[] = [
   'Приветствие и начало',
@@ -18,7 +18,6 @@ export const DEFAULT_PLACEHOLDERS: PlaceholderConfig[] = [
     description: 'Имя или обращение к собеседнику',
     type: 'text',
     defaultValue: 'Алексей',
-    excelColumnBinding: 'Клиент',
   },
   {
     id: 'ph-2',
@@ -35,7 +34,6 @@ export const DEFAULT_PLACEHOLDERS: PlaceholderConfig[] = [
     description: 'Идентификатор заказа или накладной',
     type: 'text',
     defaultValue: 'ORD-78192',
-    excelColumnBinding: 'Номер заказа',
   },
   {
     id: 'ph-4',
@@ -45,7 +43,6 @@ export const DEFAULT_PLACEHOLDERS: PlaceholderConfig[] = [
     type: 'choice',
     options: ['СДЭК', 'Boxberry', 'Почта России', 'Яндекс Доставка', 'Dostavista', 'Курьер Экспресс'],
     defaultValue: 'СДЭК',
-    excelColumnBinding: 'Служба доставки',
   },
   {
     id: 'ph-5',
@@ -62,7 +59,6 @@ export const DEFAULT_PLACEHOLDERS: PlaceholderConfig[] = [
       'Задерживается по техническим причинам',
     ],
     defaultValue: 'В пути в город назначения',
-    excelColumnBinding: 'Статус',
   },
   {
     id: 'ph-6',
@@ -119,7 +115,6 @@ export const DEFAULT_PLACEHOLDERS: PlaceholderConfig[] = [
     description: 'Номер для отслеживания отправления',
     type: 'text',
     defaultValue: 'RU-89124-EXP',
-    excelColumnBinding: 'Трек-номер',
   },
   {
     id: 'ph-10',
@@ -128,7 +123,6 @@ export const DEFAULT_PLACEHOLDERS: PlaceholderConfig[] = [
     description: 'Населенный пункт получателя',
     type: 'text',
     defaultValue: 'Москва',
-    excelColumnBinding: 'Город',
   },
   {
     id: 'ph-11',
@@ -147,132 +141,6 @@ export const DEFAULT_PLACEHOLDERS: PlaceholderConfig[] = [
     type: 'choice',
     options: ['курьер', 'пвз', 'почта'],
     defaultValue: 'курьер',
-  },
-];
-
-export const DEFAULT_EXCEL_TABLES: ExcelTable[] = [
-  {
-    id: 'table-orders',
-    name: 'Заказы и отправления клиентов (Таблица с тегами)',
-    description: 'Локальная база заказов, трек-номеров и статусов с возможностью импорта Excel/CSV и фильтрацией по тегам',
-    columns: [
-      { id: 'col-1', name: 'Номер заказа', key: 'Номер заказа' },
-      { id: 'col-2', name: 'Клиент', key: 'Клиент' },
-      { id: 'col-3', name: 'Служба доставки', key: 'Служба доставки' },
-      { id: 'col-4', name: 'Трек-номер', key: 'Трек-номер' },
-      { id: 'col-5', name: 'Город', key: 'Город' },
-      { id: 'col-6', name: 'Статус', key: 'Статус' },
-      { id: 'col-7', name: 'Сумма заказа', key: 'Сумма заказа' },
-    ],
-    rows: [
-      {
-        id: 'row-1',
-        tags: ['срочно', 'сдэк', 'мск', 'вип'],
-        data: {
-          'Номер заказа': 'ORD-90214',
-          'Клиент': 'Елена Ростова',
-          'Служба доставки': 'СДЭК',
-          'Трек-номер': '1492019482',
-          'Город': 'Москва',
-          'Статус': 'В пути в город назначения',
-          'Сумма заказа': '14 500 ₽',
-        },
-        notes: 'Клиент просит доставить строго до 18:00',
-      },
-      {
-        id: 'row-2',
-        tags: ['возврат', 'boxberry', 'спб', 'брак'],
-        data: {
-          'Номер заказа': 'ORD-77312',
-          'Клиент': 'Максим Васильев',
-          'Служба доставки': 'Boxberry',
-          'Трек-номер': 'BB-9921401',
-          'Город': 'Санкт-Петербург',
-          'Статус': 'Ожидает в пункте выдачи (ПВЗ)',
-          'Сумма заказа': '4 800 ₽',
-        },
-        notes: 'Запрошен акт осмотра поврежденной коробки',
-      },
-      {
-        id: 'row-3',
-        tags: ['яндекс', 'курьер', 'екатеринбург'],
-        data: {
-          'Номер заказа': 'ORD-55419',
-          'Клиент': 'Алина Соколова',
-          'Служба доставки': 'Яндекс Доставка',
-          'Трек-номер': 'YD-502194',
-          'Город': 'Екатеринбург',
-          'Статус': 'Передан курьеру',
-          'Сумма заказа': '8 900 ₽',
-        },
-        notes: 'Оплата наличными курьеру при получении',
-      },
-      {
-        id: 'row-4',
-        tags: ['почта', 'казань', 'задержка'],
-        data: {
-          'Номер заказа': 'ORD-33108',
-          'Клиент': 'Даниил Морозов',
-          'Служба доставки': 'Почта России',
-          'Трек-номер': '19000045912',
-          'Город': 'Казань',
-          'Статус': 'Задерживается по техническим причинам',
-          'Сумма заказа': '3 200 ₽',
-        },
-        notes: 'Начислена компенсация 500 бонусов за сдвиг срока',
-      },
-      {
-        id: 'row-5',
-        tags: ['сдэк', 'новосибирск', 'доставлен'],
-        data: {
-          'Номер заказа': 'ORD-88204',
-          'Клиент': 'Виктория Ковалева',
-          'Служба доставки': 'СДЭК',
-          'Трек-номер': '1489920194',
-          'Город': 'Новосибирск',
-          'Статус': 'Успешно доставлен и вручен',
-          'Сумма заказа': '21 000 ₽',
-        },
-        notes: 'Повторный заказ, постоянный покупатель',
-      },
-    ],
-    updatedAt: Date.now() - 1000 * 3600 * 4,
-  },
-  {
-    id: 'table-regulations',
-    name: 'Регламенты и лимиты поддержки',
-    description: 'Внутренние SLA, ответственные отделы и лимиты согласования компенсаций',
-    columns: [
-      { id: 'col-r1', name: 'Тип обращения', key: 'Тип обращения' },
-      { id: 'col-r2', name: 'Регламентный SLA', key: 'Регламентный SLA' },
-      { id: 'col-r3', name: 'Ответственный отдел', key: 'Ответственный отдел' },
-      { id: 'col-r4', name: 'Допустимая компенсация', key: 'Допустимая компенсация' },
-    ],
-    rows: [
-      {
-        id: 'row-reg-1',
-        tags: ['логистика', 'задержка', 'sla'],
-        data: {
-          'Тип обращения': 'Задержка отправления свыше 2 дней',
-          'Регламентный SLA': 'в течение 1 часа',
-          'Ответственный отдел': 'Отдел логистики и курьерских служб',
-          'Допустимая компенсация': '500 бонусов на счет аккаунта',
-        },
-        notes: 'Согласование старшего смены не требуется',
-      },
-      {
-        id: 'row-reg-2',
-        tags: ['брак', 'возврат', 'финансы'],
-        data: {
-          'Тип обращения': 'Повреждение товара при транспортировке',
-          'Регламентный SLA': 'в течение 2–3 часов',
-          'Ответственный отдел': 'Претензионный отдел',
-          'Допустимая компенсация': 'Полная компенсация стоимости доставки',
-        },
-        notes: 'Требуется фото накладной и упаковки',
-      },
-    ],
-    updatedAt: Date.now() - 1000 * 3600 * 24,
   },
 ];
 
@@ -409,6 +277,8 @@ export const DEFAULT_GUI_SETTINGS: GuiSettings = {
   autoCopyOnSelect: false,
   offlineModeForced: false,
   agentName: 'Александр (Поддержка)',
+  autoCheckUpdates: true,
+  autoBackupBeforeUpdate: true,
 };
 
 export const DEFAULT_METRICS: ProductivityMetrics = {

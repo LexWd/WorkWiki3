@@ -1,4 +1,4 @@
-import { PlaceholderConfig, ExcelRow, LogicBlockInfo } from '../types';
+import { PlaceholderConfig, LogicBlockInfo } from '../types';
 
 export interface ConditionEvaluation {
   matched: boolean;
@@ -57,12 +57,15 @@ export function parseConditionString(conditionStr: string): {
 export function evaluateCondition(
   conditionStr: string,
   placeholders: PlaceholderConfig[],
-  activeRow?: ExcelRow | null,
+  agentNameOrUnused?: any,
   agentName: string = 'Оператор',
   overrides: Record<string, string> = {}
 ): ConditionEvaluation {
+  const effectiveAgentName = typeof agentNameOrUnused === 'string' ? agentNameOrUnused : agentName;
+  const effectiveOverrides = typeof agentNameOrUnused === 'object' && agentNameOrUnused !== null && !('data' in agentNameOrUnused) ? agentNameOrUnused : overrides;
+
   const { variableKey, operator, expectedValue } = parseConditionString(conditionStr);
-  const rawResolved = resolveTokenValue(variableKey, placeholders, activeRow, agentName, overrides);
+  const rawResolved = resolveTokenValue(variableKey, placeholders, effectiveAgentName, effectiveAgentName, effectiveOverrides);
   const isUnresolved = rawResolved === `{{${variableKey}}}`;
   const actualValue = isUnresolved ? '' : rawResolved;
 
@@ -119,10 +122,12 @@ export function evaluateCondition(
 export function resolveLogicBlocks(
   text: string,
   placeholders: PlaceholderConfig[],
-  activeRow?: ExcelRow | null,
+  agentNameOrUnused?: any,
   agentName: string = 'Оператор',
   overrides: Record<string, string> = {}
 ): string {
+  const effectiveAgentName = typeof agentNameOrUnused === 'string' ? agentNameOrUnused : agentName;
+  const effectiveOverrides = typeof agentNameOrUnused === 'object' && agentNameOrUnused !== null && !('data' in agentNameOrUnused) ? agentNameOrUnused : overrides;
   let output = '';
   let i = 0;
 
@@ -174,9 +179,9 @@ export function resolveLogicBlocks(
         const evaluation = evaluateCondition(
           conditionPart,
           placeholders,
-          activeRow,
-          agentName,
-          overrides
+          effectiveAgentName,
+          effectiveAgentName,
+          effectiveOverrides
         );
 
         const chosenBranch = evaluation.matched ? ifTrue : ifFalse;
@@ -192,7 +197,7 @@ export function resolveLogicBlocks(
 
   // If there are nested logic blocks inside the chosen branch, perform another pass
   if (output.includes('{{?')) {
-    return resolveLogicBlocks(output, placeholders, activeRow, agentName, overrides);
+    return resolveLogicBlocks(output, placeholders, effectiveAgentName, effectiveAgentName, effectiveOverrides);
   }
 
   return output;
@@ -298,36 +303,43 @@ export function extractTokens(text: string): string[] {
 export function resolveTokenValue(
   tokenKey: string,
   placeholders: PlaceholderConfig[],
-  activeRow?: ExcelRow | null,
+  agentNameOrUnused?: any,
   agentName: string = 'Оператор',
   overrides: Record<string, string> = {}
 ): string {
+  const effectiveAgentName: string = typeof agentNameOrUnused === 'string' ? agentNameOrUnused : agentName;
+  const effectiveOverrides: Record<string, string> = 
+    (typeof agentNameOrUnused === 'object' && agentNameOrUnused !== null && !('data' in agentNameOrUnused)
+      ? agentNameOrUnused
+      : overrides) as Record<string, string>;
+
   const cleanKey = tokenKey.trim();
   const lowerKey = cleanKey.toLowerCase();
   const normKey = lowerKey.replace(/ё/g, 'е');
 
   // 1. Check explicit overrides first (including empty string when user erases placeholder)
-  if (cleanKey in overrides && overrides[cleanKey] !== undefined) {
-    return overrides[cleanKey];
+  if (cleanKey in effectiveOverrides && effectiveOverrides[cleanKey] !== undefined) {
+    return String(effectiveOverrides[cleanKey]);
   }
 
   // Check case-insensitive and ё/е normalized override
-  for (const [k, v] of Object.entries(overrides)) {
+  for (const [k, v] of Object.entries(effectiveOverrides)) {
     if (k.toLowerCase() === lowerKey && v !== undefined) {
-      return v;
+      return String(v);
     }
     if (k.toLowerCase().replace(/ё/g, 'е') === normKey && v !== undefined) {
-      return v;
+      return String(v);
     }
   }
 
   // 2. Special built-in
   if (
+    lowerKey === 'имя' ||
     lowerKey === 'имя_оператора' ||
     lowerKey === 'agent_name' ||
     normKey === 'имя_оператора'
   ) {
-    return agentName;
+    return effectiveAgentName;
   }
 
   // 3. Check placeholder config (exact, case-insensitive, ё/е normalized, or label)
@@ -349,13 +361,6 @@ export function resolveTokenValue(
   }
 
   if (config) {
-    // Check if bound to active Excel row
-    if (config.excelColumnBinding && activeRow?.data) {
-      const boundVal = activeRow.data[config.excelColumnBinding];
-      if (boundVal !== undefined && boundVal !== '') {
-        return boundVal;
-      }
-    }
     // Return default or first option (even if empty string)
     if (config.defaultValue !== undefined && config.defaultValue !== null) {
       return String(config.defaultValue);
@@ -366,38 +371,28 @@ export function resolveTokenValue(
     return '';
   }
 
-  // 4. Check if activeRow has an exact column name matching the tokenKey
-  if (activeRow?.data) {
-    if (activeRow.data[cleanKey] !== undefined) {
-      return String(activeRow.data[cleanKey]);
-    }
-    for (const [colName, val] of Object.entries(activeRow.data)) {
-      const normCol = colName.toLowerCase().replace(/\s+/g, '_').replace(/ё/g, 'е');
-      if (normCol === normKey && val !== undefined) {
-        return String(val);
-      }
-    }
-  }
-
   return `{{${tokenKey}}}`;
 }
 
 export function interpolateSnippet(
   text: string,
   placeholders: PlaceholderConfig[],
-  activeRow?: ExcelRow | null,
+  agentNameOrUnused?: any,
   agentName: string = 'Оператор',
   overrides: Record<string, string> = {}
 ): { result: string; unresolved: string[] } {
+  const effectiveAgentName = typeof agentNameOrUnused === 'string' ? agentNameOrUnused : agentName;
+  const effectiveOverrides = typeof agentNameOrUnused === 'object' && agentNameOrUnused !== null && !('data' in agentNameOrUnused) ? agentNameOrUnused : overrides;
+
   const unresolved: string[] = [];
 
   // Step 1: Resolve all logic blocks first (evaluating conditions and choosing branches)
   const textWithResolvedLogic = resolveLogicBlocks(
     text,
     placeholders,
-    activeRow,
-    agentName,
-    overrides
+    effectiveAgentName,
+    effectiveAgentName,
+    effectiveOverrides
   );
 
   // Step 2: Resolve standard placeholders
@@ -407,7 +402,7 @@ export function interpolateSnippet(
     if (key.startsWith('?')) {
       return match;
     }
-    const val = resolveTokenValue(key, placeholders, activeRow, agentName, overrides);
+    const val = resolveTokenValue(key, placeholders, effectiveAgentName, effectiveAgentName, effectiveOverrides);
     if (val === match || val === `{{${key}}}`) {
       unresolved.push(key);
       return match;

@@ -36,7 +36,6 @@ interface DesktopHeaderProps {
   isMiniMode: boolean;
   onToggleMiniMode: () => void;
   snippetCount: number;
-  tableCount?: number;
   placeholderCount: number;
   resourceCount: number;
   noteCount: number;
@@ -65,8 +64,9 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({
   onLogoClick,
 }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const isLight = settings.theme === 'light-minimal';
   const theme = getThemeClasses(settings.theme);
-  const accent = getAccentClasses(settings.accentColor);
+  const accent = getAccentClasses(settings.accentColor, isLight);
   const density = getDensityPadding(settings.density);
 
   const handleLogoAction = () => {
@@ -78,6 +78,10 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({
     }
   };
 
+  const secondaryBtnClass = isLight
+    ? 'border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 shadow-xs transition-colors shrink-0 cursor-pointer'
+    : 'border border-slate-700/80 bg-slate-800/80 hover:bg-slate-700 text-slate-300 transition-colors shrink-0 cursor-pointer';
+
   return (
     <header className={`min-h-[46px] h-auto py-1 px-2.5 sm:px-3 border-b ${theme.border} ${theme.panelHeader} flex items-center justify-between gap-2 shrink-0 select-none w-full min-w-0 z-30`}>
       {/* Brand & Navigation Tabs Container */}
@@ -86,26 +90,38 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({
         <button
           type="button"
           onClick={handleLogoAction}
-          className="flex items-center gap-2 shrink-0 text-left rounded-lg p-1 group cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 transition-all hover:bg-slate-800/60 active:scale-95"
+          className={`flex items-center gap-2 shrink-0 text-left rounded-lg p-1 group cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 transition-all ${
+            isLight ? 'hover:bg-slate-200/70' : 'hover:bg-slate-800/60'
+          } active:scale-95`}
           title="На главную: Шаблоны ответов (Ctrl+1)"
         >
           <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs shadow-sm transition-transform group-hover:scale-105 ${accent.primary}`}>
             <Zap className="w-4 h-4 fill-current" />
           </div>
           <div className="hidden lg:block shrink-0">
-            <h1 className="font-bold text-xs text-slate-100 leading-tight group-hover:text-white transition-colors">WorkWiki 3</h1>
-            <span className="text-[9px] font-mono text-slate-400 block">v{CURRENT_APP_VERSION} • Рабочее место</span>
+            <h1 className={`font-bold text-xs leading-tight transition-colors ${
+              isLight ? 'text-slate-800 group-hover:text-slate-950' : 'text-slate-100 group-hover:text-white'
+            }`}>
+              WorkWiki 3
+            </h1>
+            <span className={`text-[9px] font-mono block ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+              v{CURRENT_APP_VERSION} • Рабочее место
+            </span>
           </div>
         </button>
 
-        {/* Navigation Tabs (Without removed Excel tab) */}
-        <nav className="flex items-center gap-0.5 sm:gap-1 bg-slate-900/90 p-0.5 rounded-lg border border-slate-800 overflow-x-auto no-scrollbar min-w-0 flex-1 sm:flex-initial">
+        {/* Navigation Tabs */}
+        <nav className={`flex items-center gap-0.5 sm:gap-1 p-0.5 rounded-lg border overflow-x-auto no-scrollbar min-w-0 flex-1 sm:flex-initial ${
+          isLight ? 'bg-slate-200/80 border-slate-300' : 'bg-slate-900/90 border-slate-800'
+        }`}>
           <button
             type="button"
             onClick={() => onSelectTab('snippets')}
             className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-md text-xs font-semibold whitespace-nowrap transition-all shrink-0 cursor-pointer ${
               activeTab === 'snippets'
                 ? `${accent.primary} shadow-xs font-bold`
+                : isLight
+                ? 'text-slate-700 hover:text-slate-950 hover:bg-slate-300/60'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
             title="Шаблоны быстрых ответов (Ctrl+1)"
@@ -121,11 +137,13 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({
             className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-md text-xs font-semibold whitespace-nowrap transition-all shrink-0 cursor-pointer ${
               activeTab === 'placeholders'
                 ? `${accent.primary} shadow-xs font-bold`
+                : isLight
+                ? 'text-slate-700 hover:text-slate-950 hover:bg-slate-300/60'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
             title="База плейсхолдеров и конструктор условий (Ctrl+2)"
           >
-            <Brackets className="w-3.5 h-3.5 text-sky-400" />
+            <Brackets className={`w-3.5 h-3.5 ${isLight ? 'text-sky-600' : 'text-sky-400'}`} />
             <span>Плейсхолдеры</span>
             <span className="hidden sm:inline font-mono text-[9.5px] opacity-75">({placeholderCount})</span>
           </button>
@@ -136,11 +154,13 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({
             className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-md text-xs font-semibold whitespace-nowrap transition-all shrink-0 cursor-pointer ${
               activeTab === 'resources'
                 ? `${accent.primary} shadow-xs font-bold`
+                : isLight
+                ? 'text-slate-700 hover:text-slate-950 hover:bg-slate-300/60'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
             title="База ссылок и виджетов (Ctrl+3)"
           >
-            <Globe className="w-3.5 h-3.5 text-blue-400" />
+            <Globe className={`w-3.5 h-3.5 ${isLight ? 'text-blue-600' : 'text-blue-400'}`} />
             <span>Ссылки</span>
             <span className="hidden sm:inline font-mono text-[9.5px] opacity-75">({resourceCount})</span>
           </button>
@@ -151,11 +171,13 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({
             className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-md text-xs font-semibold whitespace-nowrap transition-all shrink-0 cursor-pointer ${
               activeTab === 'notes'
                 ? `${accent.primary} shadow-xs font-bold`
+                : isLight
+                ? 'text-slate-700 hover:text-slate-950 hover:bg-slate-300/60'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
             title="Заметки смены и чек-листы (Ctrl+4)"
           >
-            <StickyNote className="w-3.5 h-3.5 text-amber-400" />
+            <StickyNote className={`w-3.5 h-3.5 ${isLight ? 'text-amber-600' : 'text-amber-400'}`} />
             <span>Заметки</span>
             <span className="hidden sm:inline font-mono text-[9.5px] opacity-75">({noteCount})</span>
           </button>
@@ -168,12 +190,14 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({
         <button
           type="button"
           onClick={onOpenPalette}
-          className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg border border-slate-700/80 bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-xs transition-colors shrink-0 cursor-pointer"
+          className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs ${secondaryBtnClass}`}
           title="Быстрый поиск шаблонов (Ctrl+K или /)"
         >
-          <Search className="w-3.5 h-3.5 text-sky-400" />
+          <Search className={`w-3.5 h-3.5 ${isLight ? 'text-sky-600' : 'text-sky-400'}`} />
           <span className="hidden md:inline">Поиск</span>
-          <kbd className="hidden xl:inline-block font-mono text-[9.5px] bg-black/40 px-1 py-0.2 rounded border border-slate-700 text-slate-400">
+          <kbd className={`hidden xl:inline-block font-mono text-[9.5px] px-1 py-0.2 rounded border ${
+            isLight ? 'bg-slate-100 border-slate-300 text-slate-600' : 'bg-black/40 border-slate-700 text-slate-400'
+          }`}>
             Ctrl+K
           </kbd>
         </button>
@@ -185,14 +209,16 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({
             onClick={onOpenUpdateModal}
             className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
               hasUpdateAvailable
-                ? 'bg-sky-500/20 text-sky-300 border-sky-400 animate-pulse shadow-md ring-1 ring-sky-400/40'
-                : 'border-slate-700/80 bg-slate-800/80 hover:bg-slate-700 text-slate-300'
+                ? isLight
+                  ? 'bg-sky-100 text-sky-800 border-sky-400 animate-pulse shadow-xs ring-1 ring-sky-300'
+                  : 'bg-sky-500/20 text-sky-300 border-sky-400 animate-pulse shadow-md ring-1 ring-sky-400/40'
+                : secondaryBtnClass
             }`}
             title={hasUpdateAvailable ? 'Доступно обновление WorkWiki 3!' : 'Проверка обновлений (без переустановки)'}
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${hasUpdateAvailable ? 'text-sky-400' : 'text-slate-400'}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${hasUpdateAvailable ? (isLight ? 'text-sky-700' : 'text-sky-400') : (isLight ? 'text-slate-500' : 'text-slate-400')}`} />
             {hasUpdateAvailable ? (
-              <span className="text-[11px] font-bold text-sky-200">Обновить!</span>
+              <span className={`text-[11px] font-bold ${isLight ? 'text-sky-900' : 'text-sky-200'}`}>Обновить!</span>
             ) : (
               <span className="hidden xl:inline text-[11px]">v{CURRENT_APP_VERSION}</span>
             )}
@@ -205,7 +231,7 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({
           <button
             type="button"
             onClick={onOpenShortcuts}
-            className="p-1.5 rounded-lg border border-slate-700/80 hover:bg-slate-800 text-slate-300 transition-colors shrink-0 cursor-pointer"
+            className={`p-1.5 rounded-lg ${secondaryBtnClass}`}
             title="Горячие клавиши (нажмите ?)"
           >
             <Keyboard className="w-3.5 h-3.5" />
@@ -216,12 +242,16 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({
             <button
               type="button"
               onClick={onOpenHistory}
-              className="flex items-center gap-1 p-1.5 rounded-lg border border-slate-700/80 hover:bg-slate-800 text-slate-300 transition-colors shrink-0 cursor-pointer relative"
+              className={`flex items-center gap-1 p-1.5 rounded-lg ${secondaryBtnClass} relative`}
               title="История скопированных ответов"
             >
-              <History className="w-3.5 h-3.5 text-sky-400" />
+              <History className={`w-3.5 h-3.5 ${isLight ? 'text-sky-600' : 'text-sky-400'}`} />
               {historyCount > 0 && (
-                <span className="font-mono text-[9px] px-1 py-0.2 rounded-full bg-sky-500/20 text-sky-300 font-bold border border-sky-500/30">
+                <span className={`font-mono text-[9px] px-1 py-0.2 rounded-full font-bold border ${
+                  isLight
+                    ? 'bg-sky-100 text-sky-800 border-sky-200'
+                    : 'bg-sky-500/20 text-sky-300 border-sky-500/30'
+                }`}>
                   {historyCount > 9 ? '9+' : historyCount}
                 </span>
               )}
@@ -233,10 +263,14 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({
             <button
               type="button"
               onClick={onOpenBackupModal}
-              className="flex items-center gap-1 px-2 py-1.5 rounded-lg border border-emerald-500/40 bg-emerald-950/30 hover:bg-emerald-900/40 text-emerald-300 text-xs font-semibold transition-all shrink-0 cursor-pointer shadow-xs active:scale-95"
+              className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold transition-all shrink-0 cursor-pointer shadow-xs active:scale-95 ${
+                isLight
+                  ? 'border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800'
+                  : 'border border-emerald-500/40 bg-emerald-950/30 hover:bg-emerald-900/40 text-emerald-300'
+              }`}
               title="Резервное копирование и восстановление"
             >
-              <HardDrive className="w-3.5 h-3.5 text-emerald-400" />
+              <HardDrive className={`w-3.5 h-3.5 ${isLight ? 'text-emerald-700' : 'text-emerald-400'}`} />
               <span className="hidden lg:inline">Бэкап</span>
             </button>
           )}
@@ -248,7 +282,7 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({
             className={`p-1.5 rounded-lg border transition-colors shrink-0 cursor-pointer ${
               isMiniMode
                 ? `${accent.primary}`
-                : 'border-slate-700/80 hover:bg-slate-800 text-slate-300'
+                : secondaryBtnClass
             }`}
             title={isMiniMode ? 'Развернуть полное окно' : 'Компактный мини-HUD режим (Ctrl+B)'}
           >
@@ -331,10 +365,14 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({
           type="button"
           id="btn-app-settings"
           onClick={onOpenSettings}
-          className="p-1.5 rounded-lg border border-slate-700/80 hover:bg-slate-800 text-slate-200 transition-colors shrink-0 cursor-pointer bg-slate-800/90 shadow-xs ring-1 ring-slate-700/50"
+          className={`p-1.5 rounded-lg transition-colors shrink-0 cursor-pointer shadow-xs ${
+            isLight
+              ? 'border border-slate-300 bg-white hover:bg-slate-100 text-slate-700'
+              : 'border border-slate-700/80 hover:bg-slate-800 text-slate-200 bg-slate-800/90 ring-1 ring-slate-700/50'
+          }`}
           title="Настройки интерфейса и темы"
         >
-          <Settings className="w-3.5 h-3.5 text-sky-400" />
+          <Settings className={`w-3.5 h-3.5 ${isLight ? 'text-sky-600' : 'text-sky-400'}`} />
         </button>
       </div>
     </header>

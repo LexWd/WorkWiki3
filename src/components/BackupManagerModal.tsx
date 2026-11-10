@@ -24,7 +24,6 @@ import {
 import { 
   Snippet, 
   PlaceholderConfig, 
-  ExcelTable, 
   ResourceWidget, 
   NoteCard, 
   GuiSettings, 
@@ -42,7 +41,7 @@ interface BackupManagerModalProps {
   snippets: Snippet[];
   categories: string[];
   placeholders: PlaceholderConfig[];
-  tables: ExcelTable[];
+  tables?: any[];
   widgets: ResourceWidget[];
   resourceCategories: string[];
   notes: NoteCard[];
@@ -57,7 +56,6 @@ export const BackupManagerModal: React.FC<BackupManagerModalProps> = ({
   snippets,
   categories,
   placeholders,
-  tables,
   widgets,
   resourceCategories,
   notes,
@@ -73,7 +71,7 @@ export const BackupManagerModal: React.FC<BackupManagerModalProps> = ({
     summary: {
       snippets: number;
       categories: number;
-      tables: number;
+      tables?: number;
       placeholders: number;
       widgets: number;
       notes: number;
@@ -99,7 +97,6 @@ export const BackupManagerModal: React.FC<BackupManagerModalProps> = ({
     snippets,
     categories,
     placeholders,
-    tables,
     widgets,
     resourceCategories,
     notes,
@@ -265,7 +262,7 @@ export const BackupManagerModal: React.FC<BackupManagerModalProps> = ({
             </div>
 
             {/* Current workspace counters breakdown */}
-            <div className="grid grid-cols-2 sm:grid-cols-6 gap-2 pt-2 border-t border-emerald-500/20 text-[11px]">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-2 border-t border-emerald-500/20 text-[11px]">
               <div className="flex items-center gap-1.5 text-slate-300 bg-slate-900/60 px-2 py-1.5 rounded border border-slate-800">
                 <FileText className="w-3.5 h-3.5 text-sky-400 shrink-0" />
                 <span className="truncate">Шаблоны: <strong className="text-white">{snippets.length}</strong></span>
@@ -273,10 +270,6 @@ export const BackupManagerModal: React.FC<BackupManagerModalProps> = ({
               <div className="flex items-center gap-1.5 text-slate-300 bg-slate-900/60 px-2 py-1.5 rounded border border-slate-800">
                 <Brackets className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
                 <span className="truncate">Теги: <strong className="text-white">{placeholders.length}</strong></span>
-              </div>
-              <div className="flex items-center gap-1.5 text-slate-300 bg-slate-900/60 px-2 py-1.5 rounded border border-slate-800">
-                <Table className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                <span className="truncate">Таблицы: <strong className="text-white">{tables.length}</strong></span>
               </div>
               <div className="flex items-center gap-1.5 text-slate-300 bg-slate-900/60 px-2 py-1.5 rounded border border-slate-800">
                 <StickyNote className="w-3.5 h-3.5 text-amber-400 shrink-0" />
@@ -359,15 +352,14 @@ export const BackupManagerModal: React.FC<BackupManagerModalProps> = ({
                 </div>
 
                 {/* Inspect found counts */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] bg-slate-900/80 p-2.5 rounded border border-slate-800">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] bg-slate-900/80 p-2.5 rounded border border-slate-800">
                   <div>Шаблонов: <strong className="text-sky-300">{importedFile.summary.snippets}</strong></div>
                   <div>Категорий: <strong className="text-indigo-300">{importedFile.summary.categories}</strong></div>
-                  <div>Таблиц: <strong className="text-emerald-300">{importedFile.summary.tables}</strong></div>
                   <div>Заметок: <strong className="text-amber-300">{importedFile.summary.notes}</strong></div>
                   <div>Тегов: <strong className="text-purple-300">{importedFile.summary.placeholders}</strong></div>
                   <div>Виджетов/ссылок: <strong className="text-blue-300">{importedFile.summary.widgets}</strong></div>
-                  <div className="col-span-2 text-emerald-400 flex items-center gap-1">
-                    <CheckCircle2 className="w-3.5 h-3.5" /> Файл проверен и готов
+                  <div className="text-emerald-400 flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Проверен
                   </div>
                 </div>
 
@@ -501,7 +493,7 @@ export const BackupManagerModal: React.FC<BackupManagerModalProps> = ({
                       <div className="text-[10.5px] text-slate-400 flex items-center gap-2">
                         <span>Шаблонов: {point.counts.snippets}</span>
                         <span>•</span>
-                        <span>Таблиц: {point.counts.tables}</span>
+                        <span>Тегов: {point.counts.placeholders}</span>
                         <span>•</span>
                         <span>Заметок: {point.counts.notes}</span>
                       </div>

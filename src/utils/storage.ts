@@ -1,7 +1,6 @@
 import { 
   Snippet, 
   PlaceholderConfig, 
-  ExcelTable, 
   GuiSettings, 
   ProductivityMetrics, 
   ResourceWidget, 
@@ -15,7 +14,6 @@ import {
 import { 
   DEFAULT_SNIPPETS, 
   DEFAULT_PLACEHOLDERS, 
-  DEFAULT_EXCEL_TABLES, 
   DEFAULT_GUI_SETTINGS, 
   DEFAULT_METRICS,
   DEFAULT_RESOURCE_WIDGETS,
@@ -26,7 +24,6 @@ import {
 
 const SNIPPETS_KEY = 'quickreply_ru_snippets_v2';
 const PLACEHOLDERS_KEY = 'quickreply_ru_placeholders_v2';
-const TABLES_KEY = 'quickreply_ru_tables_v2';
 const SETTINGS_KEY = 'quickreply_ru_settings_v2';
 const METRICS_KEY = 'quickreply_ru_metrics_v2';
 const WIDGETS_KEY = 'quickreply_ru_widgets_v2';
@@ -38,7 +35,7 @@ const ALL_CATEGORIES_KEY = 'quickreply_ru_all_categories_v3';
 const CATEGORY_META_KEY = 'quickreply_ru_category_metadata_v1';
 const LEGACY_CUSTOM_CATEGORIES_KEY = 'quickreply_ru_custom_categories_v2';
 const COPY_HISTORY_KEY = 'quickreply_ru_copy_history_v1';
-const AUTO_BACKUPS_KEY = 'quickreply_ru_auto_backups_v1';
+const AUTO_BACKUPS_KEY = 'quickreply_ru_auto_backups_v2';
 const CUSTOM_ICONS_KEY = 'quickreply_ru_custom_icons_v1';
 const HIDDEN_ICONS_KEY = 'quickreply_ru_hidden_icons_v1';
 const RESOURCE_ORDER_KEY = 'quickreply_ru_resource_order_v1';
@@ -239,27 +236,6 @@ export const storage = {
     }
   },
 
-  loadExcelTables(): ExcelTable[] {
-    try {
-      const data = localStorage.getItem(TABLES_KEY);
-      if (data) {
-        const parsed = JSON.parse(data);
-        if (Array.isArray(parsed)) return parsed;
-      }
-    } catch (e) {
-      console.warn('Failed to load excel tables from storage:', e);
-    }
-    return DEFAULT_EXCEL_TABLES;
-  },
-
-  saveExcelTables(tables: ExcelTable[]) {
-    try {
-      localStorage.setItem(TABLES_KEY, JSON.stringify(tables));
-    } catch (e) {
-      console.error('Failed to save tables:', e);
-    }
-  },
-
   loadResourceWidgets(): ResourceWidget[] {
     try {
       const data = localStorage.getItem(WIDGETS_KEY);
@@ -435,7 +411,6 @@ export const storage = {
       snippets: this.loadSnippets(),
       categories: this.loadCategories(),
       placeholders: this.loadPlaceholders(),
-      tables: this.loadExcelTables(),
       widgets: this.loadResourceWidgets(),
       resourceCategories: this.loadResourceCategories(),
       notes: this.loadNotes(),
@@ -461,7 +436,7 @@ export const storage = {
     const timePart = `${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
 
     a.href = url;
-    a.download = `quickreply-desk-backup-${datePart}-${timePart}.json`;
+    a.download = `workwiki-3-backup-${datePart}-${timePart}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -479,7 +454,6 @@ export const storage = {
     summary?: {
       snippets: number;
       categories: number;
-      tables: number;
       placeholders: number;
       widgets: number;
       notes: number;
@@ -492,12 +466,11 @@ export const storage = {
     }
 
     const hasSnippets = Array.isArray(parsed.snippets);
-    const hasTables = Array.isArray(parsed.tables);
     const hasPlaceholders = Array.isArray(parsed.placeholders);
     const hasNotes = Array.isArray(parsed.notes);
     const hasWidgets = Array.isArray(parsed.widgets);
 
-    if (!hasSnippets && !hasTables && !hasPlaceholders && !hasNotes && !hasWidgets) {
+    if (!hasSnippets && !hasPlaceholders && !hasNotes && !hasWidgets) {
       return {
         isValid: false,
         error: 'В файле не обнаружены данные WorkWiki 3 (нет шаблонов, заметок или ссылок)',
@@ -509,7 +482,6 @@ export const storage = {
       summary: {
         snippets: hasSnippets ? parsed.snippets.length : 0,
         categories: Array.isArray(parsed.categories) ? parsed.categories.length : 0,
-        tables: hasTables ? parsed.tables.length : 0,
         placeholders: hasPlaceholders ? parsed.placeholders.length : 0,
         widgets: hasWidgets ? parsed.widgets.length : 0,
         notes: hasNotes ? parsed.notes.length : 0,
@@ -533,7 +505,6 @@ export const storage = {
         if (Array.isArray(parsed.snippets)) this.saveSnippets(parsed.snippets);
         if (Array.isArray(parsed.categories)) this.saveCategories(parsed.categories);
         if (Array.isArray(parsed.placeholders)) this.savePlaceholders(parsed.placeholders);
-        if (Array.isArray(parsed.tables)) this.saveExcelTables(parsed.tables);
         if (Array.isArray(parsed.widgets)) this.saveResourceWidgets(parsed.widgets);
         if (Array.isArray(parsed.resourceCategories)) this.saveResourceCategories(parsed.resourceCategories);
         if (Array.isArray(parsed.notes)) this.saveNotes(parsed.notes);
@@ -566,12 +537,6 @@ export const storage = {
             (p: PlaceholderConfig) => !existingPhKeys.has(p.key.toLowerCase())
           );
           this.savePlaceholders([...currentPh, ...toAddPh]);
-        }
-        if (Array.isArray(parsed.tables)) {
-          const currentTables = this.loadExcelTables();
-          const existingTableIds = new Set(currentTables.map((t) => t.id));
-          const toAddTables = parsed.tables.filter((t: ExcelTable) => !existingTableIds.has(t.id));
-          this.saveExcelTables([...currentTables, ...toAddTables]);
         }
         if (Array.isArray(parsed.widgets)) {
           const currentWidgets = this.loadResourceWidgets();
@@ -666,7 +631,6 @@ export const storage = {
       const existing = this.loadAutoBackups();
       const snippets = this.loadSnippets();
       const placeholders = this.loadPlaceholders();
-      const tables = this.loadExcelTables();
       const widgets = this.loadResourceWidgets();
       const notes = this.loadNotes();
       const categories = this.loadCategories();
@@ -678,7 +642,6 @@ export const storage = {
         reason,
         counts: {
           snippets: snippets.length,
-          tables: tables.length,
           placeholders: placeholders.length,
           notes: notes.length,
           widgets: widgets.length,
@@ -686,7 +649,6 @@ export const storage = {
         data: {
           snippets,
           placeholders,
-          tables,
           widgets,
           notes,
           categories,
@@ -703,13 +665,49 @@ export const storage = {
     }
   },
 
+  async createPreUpdateBackup(targetVersion: string, downloadCopy = false): Promise<{
+    point: AutoBackupPoint | null;
+    filePath?: string;
+  }> {
+    const reason = `Резервная копия перед обновлением до v${targetVersion}`;
+    const point = this.createAutoBackup(reason);
+    let filePath: string | undefined;
+
+    // Full export payload containing every single bit of data
+    const fullPayload = this.getFullBackupPayload();
+
+    const now = new Date();
+    const dateStr = now.toISOString().slice(0, 10);
+    const timeStr = `${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
+    const fileName = `workwiki-3-pre-update-v${targetVersion}-${dateStr}-${timeStr}.json`;
+
+    // If running in desktop Electron: save directly to disk in userData/backups and Documents/WorkWiki-Backups
+    if (typeof window !== 'undefined' && window.electronAPI?.saveBackupToFile) {
+      try {
+        const res = await window.electronAPI.saveBackupToFile({ payload: fullPayload, fileName });
+        if (res?.success) {
+          filePath = res.filePath;
+        }
+      } catch (e) {
+        console.warn('Electron disk backup warning:', e);
+      }
+    } else if (downloadCopy && typeof window !== 'undefined') {
+      try {
+        this.downloadFullBackup(fullPayload);
+      } catch (e) {
+        console.warn('Browser download backup warning:', e);
+      }
+    }
+
+    return { point, filePath };
+  },
+
   resetAllData() {
     // Before wiping, save a safety rollback snapshot
     this.createAutoBackup('Снимок перед сбросом к начальным данным');
 
     localStorage.removeItem(SNIPPETS_KEY);
     localStorage.removeItem(PLACEHOLDERS_KEY);
-    localStorage.removeItem(TABLES_KEY);
     localStorage.removeItem(WIDGETS_KEY);
     localStorage.removeItem(NOTES_KEY);
     localStorage.removeItem(SETTINGS_KEY);

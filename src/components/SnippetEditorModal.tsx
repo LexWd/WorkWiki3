@@ -14,7 +14,7 @@ import {
   Check,
   Split
 } from 'lucide-react';
-import { Snippet, PlaceholderConfig, ExcelRow, GuiSettings, CategoryMetadata } from '../types';
+import { Snippet, PlaceholderConfig, GuiSettings, CategoryMetadata } from '../types';
 import { getThemeClasses, getAccentClasses } from '../utils/theme';
 import { interpolateSnippet } from '../utils/interpolator';
 import { getCategoryMeta, renderCategoryIcon } from '../utils/categoryMeta';
@@ -26,7 +26,7 @@ interface SnippetEditorModalProps {
   onClose: () => void;
   onSave: (data: Omit<Snippet, 'id' | 'usageCount' | 'updatedAt'> & { id?: string }) => void;
   placeholders: PlaceholderConfig[];
-  activeRow: ExcelRow | null;
+  activeRow?: any;
   settings: GuiSettings;
   availableCategories?: string[];
   categoryMetadata?: Record<string, CategoryMetadata>;
@@ -50,7 +50,6 @@ export const SnippetEditorModal: React.FC<SnippetEditorModalProps> = ({
   onClose,
   onSave,
   placeholders,
-  activeRow,
   settings,
   availableCategories = DEFAULT_CATEGORIES,
   categoryMetadata,
@@ -138,11 +137,6 @@ export const SnippetEditorModal: React.FC<SnippetEditorModalProps> = ({
         typeDesc = 'Дата';
       }
       return { status: 'valid', typeLabel: typeDesc, config: found };
-    }
-
-    // Active Excel row keys
-    if (activeRow && (clean in activeRow || lower in activeRow)) {
-      return { status: 'valid', typeLabel: 'Колонка таблицы' };
     }
 
     return { status: 'unknown', typeLabel: 'Не найден в справочнике' };
@@ -286,7 +280,7 @@ export const SnippetEditorModal: React.FC<SnippetEditorModalProps> = ({
 
     flushText();
     return segments;
-  }, [content, placeholders, activeRow]);
+  }, [content, placeholders]);
 
   // Aggregate statistics on found tokens, logic blocks and errors
   const syntaxStats = useMemo(() => {

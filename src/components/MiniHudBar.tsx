@@ -1,13 +1,13 @@
 import React, { useState, useMemo } from 'react';
-import { Zap, Copy, Check, Search, Maximize2, FileSpreadsheet, Keyboard } from 'lucide-react';
-import { Snippet, PlaceholderConfig, ExcelRow, GuiSettings } from '../types';
+import { Zap, Copy, Check, Search, Maximize2, Keyboard } from 'lucide-react';
+import { Snippet, PlaceholderConfig, GuiSettings } from '../types';
 import { getThemeClasses, getAccentClasses } from '../utils/theme';
 import { interpolateSnippet } from '../utils/interpolator';
 
 interface MiniHudBarProps {
   snippets: Snippet[];
   placeholders: PlaceholderConfig[];
-  activeRow?: ExcelRow | null;
+  activeRow?: any;
   onCopySnippet: (snippet: Snippet) => void;
   onToggleMiniMode: () => void;
   settings: GuiSettings;
