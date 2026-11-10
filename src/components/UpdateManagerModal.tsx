@@ -80,12 +80,12 @@ export const UpdateManagerModal: React.FC<UpdateManagerModalProps> = ({
     soundService.playClick(settings.soundEffects);
 
     try {
-      const res = await updateManager.checkForUpdates();
+      const res = await updateManager.checkForUpdates(true);
       setCheckResult(res);
       if (res.checkFailed) {
         setStatusMessage(res.errorMessage || 'Не удалось связаться с серверами обновлений.');
       } else if (!res.hasUpdate) {
-        setStatusMessage(`У вас установлена самая актуальная версия WorkWiki 3 (v${CURRENT_APP_VERSION}).`);
+        setStatusMessage(`У вас установлена самая актуальная версия WorkWiki 3 (v${res.currentVersion || updateManager.getCurrentVersion()}).`);
       }
     } catch {
       setStatusMessage('Не удалось связаться с сервером обновлений. Проверьте соединение.');
@@ -157,6 +157,11 @@ export const UpdateManagerModal: React.FC<UpdateManagerModalProps> = ({
         setDownloadProgressText('Установка обновления и перезапуск приложения...');
         soundService.playSuccess(settings.soundEffects);
 
+        updateManager.setInstalledVersion(checkResult.latestVersion);
+        if (typeof window !== 'undefined' && window.sessionStorage) {
+          window.sessionStorage.setItem('workwiki_just_updated', checkResult.latestVersion);
+        }
+
         // Allow user to see 100% and restart status before app closes
         setTimeout(async () => {
           await updateManager.installUpdateAndRestart(res.filePath!);
@@ -208,7 +213,7 @@ export const UpdateManagerModal: React.FC<UpdateManagerModalProps> = ({
               <div className="flex items-center gap-2">
                 <h2 className="text-sm font-bold text-white">Центр обновлений WorkWiki 3</h2>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-sky-400 border border-slate-700">
-                  v{CURRENT_APP_VERSION}
+                  v{checkResult?.currentVersion || updateManager.getCurrentVersion()}
                 </span>
                 <span className={`text-[9.5px] px-1.5 py-0.5 rounded-md font-semibold border flex items-center gap-1 ${
                   isElectron 
@@ -242,7 +247,9 @@ export const UpdateManagerModal: React.FC<UpdateManagerModalProps> = ({
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <span className="font-semibold text-slate-200">Текущая версия:</span>
-                <span className="font-mono text-sky-300 font-bold text-xs">v{CURRENT_APP_VERSION}</span>
+                <span className="font-mono text-sky-300 font-bold text-xs">
+                  v{checkResult?.currentVersion || updateManager.getCurrentVersion()}
+                </span>
                 <span className="text-[10px] text-slate-500">•</span>
                 <span className="text-[11px] text-slate-400 font-mono">{BUILD_DATE}</span>
               </div>
@@ -428,7 +435,7 @@ export const UpdateManagerModal: React.FC<UpdateManagerModalProps> = ({
               <div className="flex items-center gap-2.5">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                 <span>
-                  {statusMessage || `У вас установлена последняя версия WorkWiki 3 (v${CURRENT_APP_VERSION}). Программа работает в оптимальном режиме.`}
+                  {statusMessage || `У вас установлена последняя версия WorkWiki 3 (v${checkResult?.currentVersion || updateManager.getCurrentVersion()}). Программа работает в оптимальном режиме.`}
                 </span>
               </div>
               <div className="flex items-center gap-2 shrink-0">

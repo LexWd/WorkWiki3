@@ -1,7 +1,8 @@
 import { storage } from './storage';
 
-export const CURRENT_APP_VERSION = '2.3.2';
-export const BUILD_DATE = '2026-09-27';
+export const DEFAULT_APP_VERSION = '2.4.0';
+export const CURRENT_APP_VERSION = DEFAULT_APP_VERSION;
+export const BUILD_DATE = '2026-11-10';
 export const GITHUB_REPO_URL = 'https://github.com/lexwd/WorkWiki3';
 export const GITHUB_PAGE_URL = 'https://lexwd.github.io/WorkWiki3/';
 export const GITHUB_ACTIONS_URL = 'https://github.com/lexwd/WorkWiki3/actions';
@@ -136,9 +137,44 @@ let lastCheckTime = 0;
 let lastCheckResult: UpdateCheckResult | null = null;
 const CACHE_TTL_MS = 10000; // 10-second deduplication cache
 
+let dynamicAppVersion: string = CURRENT_APP_VERSION;
+
+// Initialize dynamic version if running in Electron or updated session
+if (typeof window !== 'undefined') {
+  try {
+    const savedVer = window.localStorage?.getItem('workwiki_app_version');
+    if (savedVer && savedVer.trim()) {
+      dynamicAppVersion = savedVer.trim();
+    }
+  } catch {}
+}
+
 export const updateManager = {
   getCurrentVersion(): string {
-    return CURRENT_APP_VERSION;
+    return dynamicAppVersion || CURRENT_APP_VERSION;
+  },
+
+  setInstalledVersion(ver: string): void {
+    if (!ver) return;
+    dynamicAppVersion = ver.trim();
+    if (typeof window !== 'undefined') {
+      try {
+        window.localStorage?.setItem('workwiki_app_version', dynamicAppVersion);
+      } catch {}
+    }
+  },
+
+  async resolveCurrentVersion(): Promise<string> {
+    if (typeof window !== 'undefined' && window.electronAPI?.getAppVersion) {
+      try {
+        const v = await window.electronAPI.getAppVersion();
+        if (v && typeof v === 'string' && v.trim()) {
+          this.setInstalledVersion(v.trim());
+          return v.trim();
+        }
+      } catch {}
+    }
+    return this.getCurrentVersion();
   },
 
   getBuildDate(): string {
@@ -314,11 +350,13 @@ export const updateManager = {
       }
     }
 
+    const activeCurrentVersion = await this.resolveCurrentVersion();
+
     if (fetchedResults.length === 0) {
       return {
         hasUpdate: false,
-        currentVersion: CURRENT_APP_VERSION,
-        latestVersion: CURRENT_APP_VERSION,
+        currentVersion: activeCurrentVersion,
+        latestVersion: activeCurrentVersion,
         features: [],
         downloadUrl: GITHUB_SETUP_DOWNLOAD_URL,
         exeUrl: GITHUB_SETUP_DOWNLOAD_URL,
@@ -334,13 +372,13 @@ export const updateManager = {
     fetchedResults.sort((a, b) => compareSemver(a.version, b.version));
     const highest = fetchedResults[fetchedResults.length - 1];
 
-    // Compare with CURRENT_APP_VERSION (2.3.2)
-    // Only true if highest.version is strictly newer than CURRENT_APP_VERSION
-    const hasUpdate = compareSemver(CURRENT_APP_VERSION, highest.version) > 0;
+    // Compare with current active version
+    // Only true if highest.version is strictly newer than activeCurrentVersion
+    const hasUpdate = compareSemver(activeCurrentVersion, highest.version) > 0;
 
     return {
       hasUpdate,
-      currentVersion: CURRENT_APP_VERSION,
+      currentVersion: activeCurrentVersion,
       latestVersion: highest.version,
       buildDate: highest.buildDate,
       title: highest.title,
@@ -370,8 +408,12 @@ export const updateManager = {
         console.warn('Backup before update warning:', backupErr);
       }
 
+      if (targetVersion) {
+        this.setInstalledVersion(targetVersion);
+      }
+
       if (typeof window !== 'undefined' && window.sessionStorage) {
-        window.sessionStorage.setItem('workwiki_just_updated', targetVersion || CURRENT_APP_VERSION);
+        window.sessionStorage.setItem('workwiki_just_updated', targetVersion || this.getCurrentVersion());
       }
 
       if (typeof window !== 'undefined' && 'caches' in window) {

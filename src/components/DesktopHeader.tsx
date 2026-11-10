@@ -19,7 +19,7 @@ import { GuiSettings, ActiveTab } from '../types';
 import { getThemeClasses, getAccentClasses, getDensityPadding } from '../utils/theme';
 import { soundService } from '../utils/sound';
 import { PWAInstallButton } from './PWAInstallButton';
-import { CURRENT_APP_VERSION } from '../utils/updateManager';
+import { updateManager, CURRENT_APP_VERSION } from '../utils/updateManager';
 
 interface DesktopHeaderProps {
   settings: GuiSettings;
@@ -105,7 +105,7 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({
               WorkWiki 3
             </h1>
             <span className={`text-[9px] font-mono block ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-              v{CURRENT_APP_VERSION} • Рабочее место
+              v{updateManager.getCurrentVersion() || CURRENT_APP_VERSION} • Рабочее место
             </span>
           </div>
         </button>
@@ -220,7 +220,7 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({
             {hasUpdateAvailable ? (
               <span className={`text-[11px] font-bold ${isLight ? 'text-sky-900' : 'text-sky-200'}`}>Обновить!</span>
             ) : (
-              <span className="hidden xl:inline text-[11px]">v{CURRENT_APP_VERSION}</span>
+              <span className="hidden xl:inline text-[11px]">v{updateManager.getCurrentVersion() || CURRENT_APP_VERSION}</span>
             )}
           </button>
         )}

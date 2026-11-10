@@ -1,8 +1,8 @@
 {
-  "version": "2.4",
-  "buildDate": "2026-09-27",
+  "version": "2.4.0",
+  "buildDate": "2026-11-10",
   "minCompatibleVersion": "1.0.0",
-  "title": "WorkWiki 3 v2.3.2",
+  "title": "WorkWiki 3 v2.4.0",
   "downloadUrl": "https://lexwd.github.io/WorkWiki3/WorkWiki-3-Setup.exe",
   "exeUrl": "https://lexwd.github.io/WorkWiki3/WorkWiki-3-Setup.exe",
   "pageUrl": "https://lexwd.github.io/WorkWiki3/",

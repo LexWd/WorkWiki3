@@ -17,7 +17,7 @@ import { soundService } from './utils/sound';
 import { interpolateSnippet } from './utils/interpolator';
 import { copyToClipboard } from './utils/clipboard';
 import { getThemeClasses, getAccentClasses, getFontScaleStyle } from './utils/theme';
-import { checkForUpdate, CURRENT_APP_VERSION } from './utils/updateManager';
+import { checkForUpdate, updateManager, CURRENT_APP_VERSION } from './utils/updateManager';
 import { DesktopHeader } from './components/DesktopHeader';
 import { SnippetListPanel } from './components/SnippetListPanel';
 import { LiveComposerAndResolver } from './components/LiveComposerAndResolver';
@@ -116,11 +116,16 @@ export default function App() {
       }
     }
 
+    // Dynamically resolve installed version from Electron host if available
+    updateManager.resolveCurrentVersion().catch(() => {});
+
     if (settings.autoCheckUpdates !== false) {
       checkForUpdate()
         .then((res) => {
           if (res.hasUpdate) {
             setHasUpdateAvailable(true);
+          } else {
+            setHasUpdateAvailable(false);
           }
         })
         .catch(() => {});
